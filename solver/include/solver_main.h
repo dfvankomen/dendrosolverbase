@@ -16,6 +16,6 @@
 #include "../dendro/include/dendroProfileParams.h"
 #include "ets.h"
 #include "enuts.h"
-#include "dsolveCtx.h"
+#include "solverCtx.h"
 
 #endif // end of SFCSORTBENCH_GR_H

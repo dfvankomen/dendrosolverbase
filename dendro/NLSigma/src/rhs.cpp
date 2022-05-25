@@ -52,10 +52,10 @@ void nlsmRhs(double **unzipVarsRHS, const double **uZipVars,
 
   nlsm::timer::t_deriv.stop();
 
-  register double x;
-  register double y;
-  register double z;
-  register unsigned int pp;
+  double x; // originallly given "register" in front
+  double y; // originallly given "register" in front
+  double z; // originallly given "register" in front
+  unsigned int pp; // originallly given "register" in front
 
   double r;
   double eta;

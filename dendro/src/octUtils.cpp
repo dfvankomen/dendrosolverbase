@@ -736,7 +736,7 @@ void octree2BlockDecomposition(std::vector<ot::TreeNode> &pNodes, std::vector<ot
                 y = parent.getY() + (((int)((bool)(hindex & 2u))) << (pMaxDepthBit));
                 z = parent.getZ() + (((int)((bool)(hindex & 4u))) << (pMaxDepthBit));
 
-                if ((childHasRegLev[i] == 1))
+                if (childHasRegLev[i] == 1)
                 {
                     if ((parent.getLevel() + 1) <= currRegGridLev)
                     {

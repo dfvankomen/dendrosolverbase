@@ -39,7 +39,7 @@ namespace dsolve
         WEIGHT_FUNC
     };
 
-    class EMDACtx : public ts::Ctx<EMDACtx, DendroScalar, DendroIntL>
+    class SOLVERCtx : public ts::Ctx<SOLVERCtx, DendroScalar, DendroIntL>
     {
 
     protected:
@@ -69,10 +69,10 @@ namespace dsolve
 
     public:
         /**@brief: default constructor*/
-        EMDACtx(ot::Mesh *pMesh);
+        SOLVERCtx(ot::Mesh *pMesh);
 
         /**@brief: default deconstructor*/
-        ~EMDACtx();
+        ~SOLVERCtx();
 
         /**
              * @brief sets time adaptive offset

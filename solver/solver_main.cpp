@@ -7,14 +7,14 @@
  * :::License:::
  */
 
-#include "solver_main.h"
-#include "grUtils.h"
+#include "include/solver_main.h"
+#include "include/grUtils.h"
 #include "mpi.h"
 #include "TreeNode.h"
 #include "mesh.h"
 #include <vector>
 #include <iostream>
-#include "rkSolver.h"
+#include "include/rkSolver.h"
 #include "octUtils.h"
 #include "meshUtils.h"
 

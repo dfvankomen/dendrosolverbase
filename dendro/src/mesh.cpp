@@ -553,11 +553,11 @@ namespace ot
         ot::TreeNode *inPtr = (&(*(m_uiEmbeddedOctree.begin())));
         unsigned int domain_max = 1u << (m_uiMaxDepth);
         SearchKey skey;
-        register unsigned int mySz;
-        register unsigned int myX;
-        register unsigned int myY;
-        register unsigned int myZ;
-        register unsigned int myLev;
+        unsigned int mySz; // originallly given "register" in front
+        unsigned int myX; // originallly given "register" in front
+        unsigned int myY; // originallly given "register" in front
+        unsigned int myZ; // originallly given "register" in front
+        unsigned int myLev; // originallly given "register" in front
         const unsigned int K = 1;
 
         for (int i = 0; i < m_uiEmbeddedOctree.size(); i++)
@@ -682,11 +682,11 @@ namespace ot
         ot::TreeNode *inPtr = (&(*(m_uiAllElements.begin())));
         unsigned int domain_max = 1u << (m_uiMaxDepth);
         SearchKey skey;
-        register unsigned int mySz;
-        register unsigned int myX;
-        register unsigned int myY;
-        register unsigned int myZ;
-        register unsigned int myLev;
+        unsigned int mySz; // originallly given "register" in front
+        unsigned int myX; // originallly given "register" in front
+        unsigned int myY; // originallly given "register" in front
+        unsigned int myZ; // originallly given "register" in front
+        unsigned int myLev; // originallly given "register" in front
         const unsigned int K = 1;
 
         for (unsigned int i = m_uiElementPreGhostBegin; i < m_uiElementPreGhostEnd; i++)
@@ -884,11 +884,11 @@ namespace ot
         unsigned int domain_max = 1u << (m_uiMaxDepth);
         SearchKey skey;
         unsigned int elementLookUp;
-        register unsigned int mySz;
-        register unsigned int myX;
-        register unsigned int myY;
-        register unsigned int myZ;
-        register unsigned int myLev;
+        unsigned int mySz; // originallly given "register" in front
+        unsigned int myX; // originallly given "register" in front
+        unsigned int myY; // originallly given "register" in front
+        unsigned int myZ; // originallly given "register" in front
+        unsigned int myLev; // originallly given "register" in front
         const unsigned int K = 1;
 
         // note : this is just to find the boundary of the local octree. boundary octants should be face 2 distance from the ghsot elemnts.
@@ -9082,7 +9082,7 @@ namespace ot
                             searchResultIndex[pCount] = e + 1;
                             pCount++;
                         }
-                        else if ((e == (balOct1.size() - 1)))
+                        else if (e == (balOct1.size() - 1))
                         {
                             searchResultIndex[pCount] = balOct1.size();
                         }

@@ -15,7 +15,7 @@
 
 namespace dsolve
 {
-    EMDACtx::EMDACtx(ot::Mesh *pMesh) : Ctx()
+    SOLVERCtx::SOLVERCtx(ot::Mesh *pMesh) : Ctx()
     {
         m_uiMesh = pMesh;
         // variable allocation for evolution variables
@@ -45,7 +45,7 @@ namespace dsolve
         return;
     }
 
-    EMDACtx::~EMDACtx()
+    SOLVERCtx::~SOLVERCtx()
     {
         this->destroy_vec(m_uiEVar);
         this->destroy_vec(m_uiCVar);
@@ -55,7 +55,7 @@ namespace dsolve
         this->destroy_vec(m_uiCUnzip[0]);
     }
 
-    int EMDACtx::initialize()
+    int SOLVERCtx::initialize()
     {
         if (dsolve::DENDROSOLVER_RESTORE_SOLVER)
         {
@@ -134,7 +134,7 @@ namespace dsolve
         return 0;
     }
 
-    int EMDACtx::init_grid()
+    int SOLVERCtx::init_grid()
     {
 
         unsigned int nodeLookUp_CG;
@@ -291,12 +291,12 @@ namespace dsolve
         return 0;
     }
 
-    int EMDACtx::finalize()
+    int SOLVERCtx::finalize()
     {
         return 0;
     }
 
-    int EMDACtx::rhs(DVec *in, DVec *out, unsigned int sz, DendroScalar time)
+    int SOLVERCtx::rhs(DVec *in, DVec *out, unsigned int sz, DendroScalar time)
     {
         // all the variables should be packed together.
         assert(sz == 1);
@@ -329,7 +329,7 @@ namespace dsolve
         return 0;
     }
 
-    int EMDACtx::rhs_blkwise(DVec in, DVec out, const unsigned int *const blkIDs, unsigned int numIds, DendroScalar *blk_time) const
+    int SOLVERCtx::rhs_blkwise(DVec in, DVec out, const unsigned int *const blkIDs, unsigned int numIds, DendroScalar *blk_time) const
     {
 
         DendroScalar **unzipIn;
@@ -390,7 +390,7 @@ namespace dsolve
         return 0;
     }
 
-    int EMDACtx::rhs_blk(const DendroScalar *in, DendroScalar *out, unsigned int dof, unsigned int local_blk_id, DendroScalar blk_time) const
+    int SOLVERCtx::rhs_blk(const DendroScalar *in, DendroScalar *out, unsigned int dof, unsigned int local_blk_id, DendroScalar blk_time) const
     {
         //return 0;
         //std::cout<<"solver_rhs"<<std::endl;
@@ -474,7 +474,7 @@ namespace dsolve
         return 0;
     }
 
-    int EMDACtx::pre_stage_blk(DendroScalar *in, unsigned int dof, unsigned int local_blk_id, DendroScalar blk_time) const
+    int SOLVERCtx::pre_stage_blk(DendroScalar *in, unsigned int dof, unsigned int local_blk_id, DendroScalar blk_time) const
     {
 
         DendroScalar **unzipIn = new DendroScalar *[dof];
@@ -532,17 +532,17 @@ namespace dsolve
         return 0;
     }
 
-    int EMDACtx::post_stage_blk(DendroScalar *in, unsigned int dof, unsigned int local_blk_id, DendroScalar blk_time) const
+    int SOLVERCtx::post_stage_blk(DendroScalar *in, unsigned int dof, unsigned int local_blk_id, DendroScalar blk_time) const
     {
         return 0;
     }
 
-    int EMDACtx::pre_timestep_blk(DendroScalar *in, unsigned int dof, unsigned int local_blk_id, DendroScalar blk_time) const
+    int SOLVERCtx::pre_timestep_blk(DendroScalar *in, unsigned int dof, unsigned int local_blk_id, DendroScalar blk_time) const
     {
         return 0;
     }
 
-    int EMDACtx::post_timestep_blk(DendroScalar *in, unsigned int dof, unsigned int local_blk_id, DendroScalar blk_time) const
+    int SOLVERCtx::post_timestep_blk(DendroScalar *in, unsigned int dof, unsigned int local_blk_id, DendroScalar blk_time) const
     {
         DendroScalar **unzipIn = new DendroScalar *[dof];
         const unsigned int blk = local_blk_id;
@@ -599,7 +599,7 @@ namespace dsolve
         return 0;
     }
 
-    int EMDACtx::write_vtu()
+    int SOLVERCtx::write_vtu()
     {
 
         unzip(m_uiEVar, m_uiEUnzip[0], DENDROSOLVER_ASYNC_COMM_K);
@@ -725,7 +725,7 @@ namespace dsolve
         return 0;
     }
 
-    int EMDACtx::write_checkpt()
+    int SOLVERCtx::write_checkpt()
     {
         if (m_uiMesh->isActive())
         {
@@ -765,7 +765,7 @@ namespace dsolve
             if (!rank)
             {
                 sprintf(fName, "%s_step_%d.cp", dsolve::DENDROSOLVER_CHKPT_FILE_PREFIX.c_str(), cpIndex);
-                std::cout << "[EMDACtx] \t writing checkpoint file : " << fName << std::endl;
+                std::cout << "[SOLVERCtx] \t writing checkpoint file : " << fName << std::endl;
                 std::ofstream outfile(fName);
                 if (!outfile)
                 {
@@ -805,7 +805,7 @@ namespace dsolve
         return 0;
     }
 
-    int EMDACtx::restore_checkpt()
+    int SOLVERCtx::restore_checkpt()
     {
         unsigned int numVars = 0;
         std::vector<ot::TreeNode> octree;
@@ -881,7 +881,7 @@ namespace dsolve
         restoreStatus = 0;
         octree.clear();
         if (!rank)
-            std::cout << "[EMDACtx] :  Trying to restore from checkpoint index : " << restoreFileIndex << std::endl;
+            std::cout << "[SOLVERCtx] :  Trying to restore from checkpoint index : " << restoreFileIndex << std::endl;
 
         if (!rank)
         {
@@ -919,7 +919,7 @@ namespace dsolve
         if (restoreStatusGlobal == 1)
         {
             if (!rank)
-                std::cout << "[EMDACtx] : Restore step failed, restore file corrupted. " << std::endl;
+                std::cout << "[SOLVERCtx] : Restore step failed, restore file corrupted. " << std::endl;
             MPI_Abort(comm, 0);
         }
 
@@ -938,7 +938,7 @@ namespace dsolve
         if (activeCommSz > npes)
         {
             if (!rank)
-                std::cout << " [EMDACtx] : checkpoint file written from  a larger communicator than the current global comm. (i.e. communicator shrinking not allowed in the restore step. )" << std::endl;
+                std::cout << " [SOLVERCtx] : checkpoint file written from  a larger communicator than the current global comm. (i.e. communicator shrinking not allowed in the restore step. )" << std::endl;
 
             MPI_Abort(comm, 0);
         }
@@ -968,7 +968,7 @@ namespace dsolve
         {
 
             if (!rank)
-                std::cout << "[EMDACtx]: octree (*.oct) restore file is corrupted " << std::endl;
+                std::cout << "[SOLVERCtx]: octree (*.oct) restore file is corrupted " << std::endl;
             MPI_Abort(comm, 0);
         }
 
@@ -1004,7 +1004,7 @@ namespace dsolve
         {
 
             if (!rank)
-                std::cout << "[EMDACtx]: varible (*.var) restore file currupted " << std::endl;
+                std::cout << "[SOLVERCtx]: varible (*.var) restore file currupted " << std::endl;
             MPI_Abort(comm, 0);
         }
 
@@ -1023,24 +1023,24 @@ namespace dsolve
         return 0;
     }
 
-    int EMDACtx::pre_timestep(DVec sIn)
+    int SOLVERCtx::pre_timestep(DVec sIn)
     {
 
         return 0;
     }
 
-    int EMDACtx::pre_stage(DVec sIn)
+    int SOLVERCtx::pre_stage(DVec sIn)
     {
 
         return 0;
     }
 
-    int EMDACtx::post_stage(DVec sIn)
+    int SOLVERCtx::post_stage(DVec sIn)
     {
         return 0;
     }
 
-    int EMDACtx::post_timestep(DVec sIn)
+    int SOLVERCtx::post_timestep(DVec sIn)
     {
         // we need to enforce constraint before computing the HAM and MOM_i constraints.
         DendroScalar **sVar;
@@ -1054,7 +1054,7 @@ namespace dsolve
         return 0;
     }
 
-    bool EMDACtx::is_remesh()
+    bool SOLVERCtx::is_remesh()
     {
         bool isRefine = false;
         if (dsolve::DENDROSOLVER_ENABLE_BLOCK_ADAPTIVITY)
@@ -1102,7 +1102,7 @@ namespace dsolve
         return isRefine;
     }
 
-    int EMDACtx::update_app_vars()
+    int SOLVERCtx::update_app_vars()
     {
         m_uiEVar = m_uiEvolutionVar[0];
         m_uiCVar = m_uiConstrainedVar[0];
@@ -1115,22 +1115,22 @@ namespace dsolve
         return 0;
     }
 
-    DVec EMDACtx::get_evolution_vars()
+    DVec SOLVERCtx::get_evolution_vars()
     {
         return m_uiEVar;
     }
 
-    DVec EMDACtx::get_constraint_vars()
+    DVec SOLVERCtx::get_constraint_vars()
     {
         return m_uiCVar;
     }
 
-    DVec EMDACtx::get_primitive_vars()
+    DVec SOLVERCtx::get_primitive_vars()
     {
         return m_uiPVar;
     }
 
-    int EMDACtx::terminal_output()
+    int SOLVERCtx::terminal_output()
     {
         DendroScalar min = 0, max = 0;
         m_uiEVar.VecMinMax(m_uiMesh, min, max, dsolve::VAR::U_ALPHA);
@@ -1139,7 +1139,7 @@ namespace dsolve
         {
             if (!(m_uiMesh->getMPIRank()))
             {
-                std::cout << "[EMDACtx]:  " << dsolve::DENDROSOLVER_VAR_NAMES[dsolve::VAR::U_ALPHA] << " (min,max) : \t ( " << min << ", " << max << " ) " << std::endl;
+                std::cout << "[SOLVERCtx]:  " << dsolve::DENDROSOLVER_VAR_NAMES[dsolve::VAR::U_ALPHA] << " (min,max) : \t ( " << min << ", " << max << " ) " << std::endl;
                 if (std::isnan(min) || std::isnan(max))
                 {
                     std::cout << "[Error]: NAN detected " << std::endl;
@@ -1151,7 +1151,7 @@ namespace dsolve
         return 0;
     }
 
-    unsigned int EMDACtx::compute_lts_ts_offset()
+    unsigned int SOLVERCtx::compute_lts_ts_offset()
     {
 
         const ot::Block *blkList = m_uiMesh->getLocalBlockList().data();
@@ -1208,7 +1208,7 @@ namespace dsolve
         return DENDROSOLVER_LTS_TS_OFFSET;
     }
 
-    unsigned int EMDACtx::getBlkTimestepFac(unsigned int blev, unsigned int lmin, unsigned int lmax)
+    unsigned int SOLVERCtx::getBlkTimestepFac(unsigned int blev, unsigned int lmin, unsigned int lmax)
     {
         const unsigned int ldiff = DENDROSOLVER_LTS_TS_OFFSET;
         if ((lmax - blev) <= ldiff)
@@ -1219,7 +1219,7 @@ namespace dsolve
         }
     }
 
-    void EMDACtx::evolve_bh_loc(DVec sIn, double dt)
+    void SOLVERCtx::evolve_bh_loc(DVec sIn, double dt)
     {
 #ifdef DENDROSOLVER_EXTRACT_BH_LOCATIONS
 
@@ -1261,7 +1261,7 @@ namespace dsolve
         return;
     }
 
-    void EMDACtx::lts_smooth(DVec sIn, LTS_SMOOTH_MODE mode)
+    void SOLVERCtx::lts_smooth(DVec sIn, LTS_SMOOTH_MODE mode)
     {
         // NOTE: this function seems entirely unused
         // TODO: remove it or update with it being removed

@@ -440,7 +440,7 @@ namespace nlsm
         restoreStatus = 0;
         octree.clear();
         if (!rank)
-            std::cout << "[EMDACtx] :  Trying to restore from checkpoint index : " << restoreFileIndex << std::endl;
+            std::cout << "[SOLVERCtx] :  Trying to restore from checkpoint index : " << restoreFileIndex << std::endl;
 
         if (!rank)
         {
@@ -476,7 +476,7 @@ namespace nlsm
         if (restoreStatusGlobal == 1)
         {
             if (!rank)
-                std::cout << "[EMDACtx] : Restore step failed, restore file corrupted. " << std::endl;
+                std::cout << "[SOLVERCtx] : Restore step failed, restore file corrupted. " << std::endl;
             MPI_Abort(comm, 0);
         }
 
@@ -491,7 +491,7 @@ namespace nlsm
         if (activeCommSz > npes)
         {
             if (!rank)
-                std::cout << " [EMDACtx] : checkpoint file written from  a larger communicator than the current global comm. (i.e. communicator shrinking not allowed in the restore step. )" << std::endl;
+                std::cout << " [SOLVERCtx] : checkpoint file written from  a larger communicator than the current global comm. (i.e. communicator shrinking not allowed in the restore step. )" << std::endl;
 
             MPI_Abort(comm, 0);
         }
@@ -521,7 +521,7 @@ namespace nlsm
         {
 
             if (!rank)
-                std::cout << "[EMDACtx]: octree (*.oct) restore file is corrupted " << std::endl;
+                std::cout << "[SOLVERCtx]: octree (*.oct) restore file is corrupted " << std::endl;
             MPI_Abort(comm, 0);
         }
 
@@ -556,7 +556,7 @@ namespace nlsm
         {
 
             if (!rank)
-                std::cout << "[EMDACtx]: varible (*.var) restore file currupted " << std::endl;
+                std::cout << "[SOLVERCtx]: varible (*.var) restore file currupted " << std::endl;
             MPI_Abort(comm, 0);
         }
 

@@ -45,9 +45,9 @@ namespace dsolve
     sys.modules[spec.name] = dendroconf
     spec.loader.exec_module(dendroconf)
 
-    cog.outl(dendroconf.dendroConfigs.gen_enum_code("evolution"))
+    cog.outl(dendroconf.dendroConfigs.gen_enum_code("evolution"), enum_name="DENDROSOLVER_VAR")
 
-    cog.outl(dendroconf.dendroConfigs.gen_enum_code("constraint", enum_name="VAR_CONSTRAINT"))
+    cog.outl(dendroconf.dendroConfigs.gen_enum_code("constraint", enum_name="DENDROSOLVER_VAR_CONSTRAINT"))
 
     ]]]*/
 
@@ -56,7 +56,7 @@ namespace dsolve
     // declare the enum names for human-readable printing later
     /*[[[cog
     cog.outl(dendroconf.dendroConfigs.gen_enum_names("evolution"))
-    cog.outl(dendroconf.dendroConfigs.gen_enum_names("constraint", enum_name="VAR_CONSTRAINT"))
+    cog.outl(dendroconf.dendroConfigs.gen_enum_names("constraint", enum_name="DENDROSOLVER_VAR_CONSTRAINT"))
     ]]]*/
     
     //[[[end]]]
