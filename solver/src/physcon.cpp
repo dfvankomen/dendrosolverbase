@@ -2,7 +2,6 @@
 
 #include "solver_main.h"
 
-
 using namespace dsolve;
 
 /*----------------------------------------------------------------------
@@ -28,12 +27,16 @@ void physical_constraints(double **uZipConVars, const double **uZipVars,
 
     // HAM is hamiltonian constraint
     // mom is 3 component vector - momentum constraints
+
+    // clang-format off
     /*[[[cog
     import cog
     import sys
     import os
     import importlib.util
     import dendrosym
+
+    cog.outl('// clang-format on')
 
     # get the current working directory, should be root of project
     current_path = os.getcwd()
@@ -55,79 +58,90 @@ void physical_constraints(double **uZipConVars, const double **uZipVars,
         "evolution", use_const=True, zip_var_name="uZipVars"
     ))
     ]]]*/
+    // clang-format on
 
     //[[[end]]]
 
     const unsigned int PW = dsolve::DENDROSOLVER_PADDING_WIDTH;
 
+    // clang-format off
     /*[[[cog
+    cog.outl('// clang-format on')
     cog.outl("// PARAMETER EXTRACTION FOR CONSTRAINTS")
 
     cog.outl(dendroconf.dendroConfigs.gen_parameter_code("constraint"))
 
     ]]]*/
+    // clang-format on
 
     //[[[end]]]
 
     mem::memory_pool<double> *__mem_pool = &DENDROSOLVER_MEM_POOL;
 
-    /*[[[cog
+    // get derivative workspace
+    double *const deriv_base = emda::EMDA_DERIV_WORKSPACE;
 
+    // clang-format off
+    /*[[[cog
+    cog.outl('// clang-format on')
+    
     cog.outl("//GENERATED ADVANCED DERIVATIVE EQUATIONS")
 
     print("Now generating advanced derivatves for physcon", file=sys.stderr)
-
-    # note that we need to store the deallocation string as well for later down
-    the line! (intermediate_grad_str, deallocate_intermediate_grad_str) =
-    dendroconf.dendroConfigs.generate_pre_necessary_derivatives( "constraint",
-    dtype="double"
-    )
+    
+    # note that we need to store the deallocation string as well for later down the line!
+    (intermediate_grad_str, 
+     deallocate_intermediate_grad_str) = dendroconf.dendroConfigs.generate_pre_necessary_derivatives(
+         "constraint", dtype="double"
+     )
 
     print("Finished generating advanced derivatves", file=sys.stderr)
 
-    intermediate_filename = "solver_physcon_intermediate_grad.cpp.inc"
+    intermediate_filename = "emda_physcon_intermediate_grad.cpp.inc"
 
     with open(os.path.join(output_path, intermediate_filename), "w") as f:
         f.write(intermediate_grad_str)
 
     print("Saved them to file", file=sys.stderr)
 
-    cog.outl(f'#include "../generated_files/{intermediate_filename}"')
-
+    cog.outl(f'#include "../gencode/{intermediate_filename}"')
+    
     ]]]*/
+    // clang-format on
 
     //[[[end]]]
 
     // create the files that have the derivative memory allocations and
     // calculations
+    // clang-format off
     /*[[[cog
+    cog.outl('// clang-format on')
 
-    deriv_alloc, deriv_calc, deriv_dealloc =
-    dendroconf.dendroConfigs.generate_deriv_allocation_and_calc("constraint")
+    deriv_alloc, deriv_calc, deriv_dealloc = dendroconf.dendroConfigs.generate_deriv_allocation_and_calc("constraint")
 
-    print("Generated derivative allocation, calculation, and deallocation code
-    for Evolution", file=sys.stderr)
+    print("Generated derivative allocation, calculation, and deallocation code for Evolution", file=sys.stderr)
 
-    alloc_filename = "solver_physcon_deriv_memalloc.cpp.inc"
+    alloc_filename = "emda_physcon_deriv_memalloc.cpp.inc"
 
     with open(os.path.join(output_path, alloc_filename), "w") as f:
         f.write(deriv_alloc)
 
-    cog.outl(f'#include "../generated_files/{alloc_filename}"')
+    cog.outl(f'#include "../gencode/{alloc_filename}"')
 
-    calc_filename = "solver_physcon_deriv_calc.cpp.inc"
+    calc_filename = "emda_physcon_deriv_calc.cpp.inc"
 
     with open(os.path.join(output_path, calc_filename), "w") as f:
         f.write(deriv_calc)
 
-    cog.outl(f'#include "../generated_files/{calc_filename}"')
+    cog.outl(f'#include "../gencode/{calc_filename}"')
 
-    dealloc_filename = "solver_physcon_deriv_memdealloc.cpp.inc"
+    dealloc_filename = "emda_physcon_deriv_memdealloc.cpp.inc"
 
     with open(os.path.join(output_path, dealloc_filename), "w") as f:
         f.write(deriv_dealloc)
 
     ]]]*/
+    // clang-format on
 
     //[[[end]]]
 
@@ -146,19 +160,21 @@ void physical_constraints(double **uZipConVars, const double **uZipVars,
                 const double z = pmin[2] + k * hz;
                 const unsigned int pp = i + nx * (j + ny * k);
 
+                // clang-format off
                 /*[[[cog
 
-                physcon_rhs_code =
-                dendroconf.dendroConfigs.generate_rhs_code("constraint",
-                include_rhs_in_name=False) physcon_filename =
-                "solver_physcon_eqns.cpp.inc"
+                cog.outl('// clang-format on')
 
-                with open(os.path.join(output_path, physcon_filename), "w") as
-                f: f.write(physcon_rhs_code)
+                physcon_rhs_code = dendroconf.dendroConfigs.generate_rhs_code("constraint", include_rhs_in_name=False)
+                physcon_filename = "emda_physcon_eqns.cpp.inc"
 
-                cog.outl(f'#include "../generated_files/{physcon_filename}"')
-
+                with open(os.path.join(output_path, physcon_filename), "w") as f:
+                    f.write(physcon_rhs_code)
+                
+                cog.outl(f'#include "../gencode/{physcon_filename}"')
+                
                 ]]]*/
+                // clang-format on
 
                 //[[[end]]]
 
@@ -172,13 +188,18 @@ void physical_constraints(double **uZipConVars, const double **uZipVars,
         }
     }
 
+    // clang-format off
     /*[[[cog
+
+    cog.outl('// clang-format on')
 
     cog.outl(deallocate_intermediate_grad_str)
 
-    cog.outl(f'#include "../generated_files/{dealloc_filename}"')
+    cog.outl(f'#include "../gencode/{dealloc_filename}"')
+    
 
     ]]]*/
+    // clang-format on
 
     //[[[end]]]
 }

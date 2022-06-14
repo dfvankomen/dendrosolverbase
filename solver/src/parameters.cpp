@@ -8,10 +8,12 @@
  *
  */
 
+// clang-format off
 /*[[[cog
 
 import cog
 import dendrosym
+cog.outl("// clang-format on")
 
 paramh_str, paramc_str = dendrosym.params.generate_all_parameter_text("dsolve",
 PARAM_SETUP_FILE)
@@ -19,6 +21,7 @@ PARAM_SETUP_FILE)
 cog.outl(paramc_str)
 
 ]]]*/
+// clang-format on
 namespace dsolve {
 mem::memory_pool<double> DENDROSOLVER_MEM_POOL =
     mem::memory_pool<double>(0, 16);

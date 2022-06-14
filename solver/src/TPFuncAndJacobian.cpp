@@ -1,12 +1,13 @@
 /* TwoPunctures:  File  "FuncAndJacobian.c"*/
 
 #include <assert.h>
+#include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
-#include <ctype.h>
 #include <time.h>
+
 #include "TPUtilities.h"
 #include "TwoPunctures.h"
 
@@ -14,37 +15,28 @@
 /*#define FAC sin(al)*sin(be)*sin(al)*sin(be)*/
 /*#define FAC 1*/
 
-static inline CCTK_REAL min(CCTK_REAL const x, CCTK_REAL const y)
-{
+static inline CCTK_REAL min(CCTK_REAL const x, CCTK_REAL const y) {
     return x < y ? x : y;
 }
 
 /* --------------------------------------------------------------------------*/
-int Index(int ivar, int i, int j, int k, int nvar, int n1, int n2, int n3)
-{
+int Index(int ivar, int i, int j, int k, int nvar, int n1, int n2, int n3) {
     int i1 = i, j1 = j, k1 = k;
 
-    if (i1 < 0)
-        i1 = -(i1 + 1);
-    if (i1 >= n1)
-        i1 = 2 * n1 - (i1 + 1);
+    if (i1 < 0) i1 = -(i1 + 1);
+    if (i1 >= n1) i1 = 2 * n1 - (i1 + 1);
 
-    if (j1 < 0)
-        j1 = -(j1 + 1);
-    if (j1 >= n2)
-        j1 = 2 * n2 - (j1 + 1);
+    if (j1 < 0) j1 = -(j1 + 1);
+    if (j1 >= n2) j1 = 2 * n2 - (j1 + 1);
 
-    if (k1 < 0)
-        k1 = k1 + n3;
-    if (k1 >= n3)
-        k1 = k1 - n3;
+    if (k1 < 0) k1 = k1 + n3;
+    if (k1 >= n3) k1 = k1 - n3;
 
     return ivar + nvar * (i1 + n1 * (j1 + n2 * k1));
 }
 
 /* --------------------------------------------------------------------------*/
-void allocate_derivs(derivs *v, int n)
-{
+void allocate_derivs(derivs *v, int n) {
     int m = n - 1;
     (*v).d0 = dvector(0, m);
     (*v).d1 = dvector(0, m);
@@ -59,8 +51,7 @@ void allocate_derivs(derivs *v, int n)
 }
 
 /* --------------------------------------------------------------------------*/
-void free_derivs(derivs *v, int n)
-{
+void free_derivs(derivs *v, int n) {
     int m = n - 1;
     free_dvector((*v).d0, 0, m);
     free_dvector((*v).d1, 0, m);
@@ -75,8 +66,7 @@ void free_derivs(derivs *v, int n)
 }
 
 /* --------------------------------------------------------------------------*/
-void Derivatives_AB3(int nvar, int n1, int n2, int n3, derivs v)
-{
+void Derivatives_AB3(int nvar, int n1, int n2, int n3, derivs v) {
     int i, j, k, ivar, N, *indx;
     CCTK_REAL *p, *dp, *d2p, *q, *dq, *r, *dr;
 
@@ -90,14 +80,11 @@ void Derivatives_AB3(int nvar, int n1, int n2, int n3, derivs v)
     dr = dvector(0, N);
     indx = ivector(0, N);
 
-    for (ivar = 0; ivar < nvar; ivar++)
-    {
-        for (k = 0; k < n3; k++)
-        { /* Calculation of Derivatives w.r.t. A-Dir. */
-            for (j = 0; j < n2; j++)
-            { /* (Chebyshev_Zeros)*/
-                for (i = 0; i < n1; i++)
-                {
+    for (ivar = 0; ivar < nvar; ivar++) {
+        for (k = 0; k < n3;
+             k++) { /* Calculation of Derivatives w.r.t. A-Dir. */
+            for (j = 0; j < n2; j++) { /* (Chebyshev_Zeros)*/
+                for (i = 0; i < n1; i++) {
                     indx[i] = Index(ivar, i, j, k, nvar, n1, n2, n3);
                     p[i] = v.d0[indx[i]];
                 }
@@ -106,19 +93,16 @@ void Derivatives_AB3(int nvar, int n1, int n2, int n3, derivs v)
                 chder(dp, d2p, n1);
                 chebft_Zeros(dp, n1, 1);
                 chebft_Zeros(d2p, n1, 1);
-                for (i = 0; i < n1; i++)
-                {
+                for (i = 0; i < n1; i++) {
                     v.d1[indx[i]] = dp[i];
                     v.d11[indx[i]] = d2p[i];
                 }
             }
         }
-        for (k = 0; k < n3; k++)
-        { /* Calculation of Derivatives w.r.t. B-Dir. */
-            for (i = 0; i < n1; i++)
-            { /* (Chebyshev_Zeros)*/
-                for (j = 0; j < n2; j++)
-                {
+        for (k = 0; k < n3;
+             k++) { /* Calculation of Derivatives w.r.t. B-Dir. */
+            for (i = 0; i < n1; i++) { /* (Chebyshev_Zeros)*/
+                for (j = 0; j < n2; j++) {
                     indx[j] = Index(ivar, i, j, k, nvar, n1, n2, n3);
                     p[j] = v.d0[indx[j]];
                     q[j] = v.d1[indx[j]];
@@ -131,20 +115,17 @@ void Derivatives_AB3(int nvar, int n1, int n2, int n3, derivs v)
                 chebft_Zeros(dp, n2, 1);
                 chebft_Zeros(d2p, n2, 1);
                 chebft_Zeros(dq, n2, 1);
-                for (j = 0; j < n2; j++)
-                {
+                for (j = 0; j < n2; j++) {
                     v.d2[indx[j]] = dp[j];
                     v.d22[indx[j]] = d2p[j];
                     v.d12[indx[j]] = dq[j];
                 }
             }
         }
-        for (i = 0; i < n1; i++)
-        { /* Calculation of Derivatives w.r.t. phi-Dir. (Fourier)*/
-            for (j = 0; j < n2; j++)
-            {
-                for (k = 0; k < n3; k++)
-                {
+        for (i = 0; i < n1;
+             i++) { /* Calculation of Derivatives w.r.t. phi-Dir. (Fourier)*/
+            for (j = 0; j < n2; j++) {
+                for (k = 0; k < n3; k++) {
                     indx[k] = Index(ivar, i, j, k, nvar, n1, n2, n3);
                     p[k] = v.d0[indx[k]];
                     q[k] = v.d1[indx[k]];
@@ -161,8 +142,7 @@ void Derivatives_AB3(int nvar, int n1, int n2, int n3, derivs v)
                 fourft(r, n3, 0);
                 fourder(r, dr, n3);
                 fourft(dr, n3, 1);
-                for (k = 0; k < n3; k++)
-                {
+                for (k = 0; k < n3; k++) {
                     v.d3[indx[k]] = dp[k];
                     v.d33[indx[k]] = d2p[k];
                     v.d13[indx[k]] = dq[k];
@@ -182,17 +162,18 @@ void Derivatives_AB3(int nvar, int n1, int n2, int n3, derivs v)
 }
 
 /* --------------------------------------------------------------------------*/
-void F_of_v(int nvar, int n1, int n2, int n3, derivs v, CCTK_REAL *F, derivs u)
-{
-    /*      Calculates the left hand sides of the non-linear equations F_m(v_n)=0*/
+void F_of_v(int nvar, int n1, int n2, int n3, derivs v, CCTK_REAL *F,
+            derivs u) {
+    /*      Calculates the left hand sides of the non-linear equations
+     * F_m(v_n)=0*/
     /*      and the function u (u.d0[]) as well as its derivatives*/
-    /*      (u.d1[], u.d2[], u.d3[], u.d11[], u.d12[], u.d13[], u.d22[], u.d23[], u.d33[])*/
+    /*      (u.d1[], u.d2[], u.d3[], u.d11[], u.d12[], u.d13[], u.d22[],
+     * u.d23[], u.d33[])*/
     /*      at interior points and at the boundaries "+/-"*/
 
     CCTK_REAL *sources;
     sources = (CCTK_REAL *)calloc(n1 * n2 * n3, sizeof(CCTK_REAL));
-    if (TPID::use_sources)
-    {
+    if (TPID::use_sources) {
         CCTK_REAL *s_x, *s_y, *s_z;
 
         s_x = (CCTK_REAL *)calloc(n1 * n2 * n3, sizeof(CCTK_REAL));
@@ -202,9 +183,7 @@ void F_of_v(int nvar, int n1, int n2, int n3, derivs v, CCTK_REAL *F, derivs u)
 #pragma omp parallel for num_threads(TP_OMP_THREADS) collapse(3)
         for (int i = 0; i < n1; i++)
             for (int j = 0; j < n2; j++)
-                for (int k = 0; k < n3; k++)
-                {
-
+                for (int k = 0; k < n3; k++) {
                     CCTK_REAL *values;
                     derivs U;
                     values = dvector(0, nvar - 1);
@@ -220,19 +199,19 @@ void F_of_v(int nvar, int n1, int n2, int n3, derivs v, CCTK_REAL *F, derivs u)
                     phi = 2. * Pi * k / n3;
 
                     Am1 = A - 1;
-                    for (int ivar = 0; ivar < nvar; ivar++)
-                    {
+                    for (int ivar = 0; ivar < nvar; ivar++) {
                         int indx = Index(ivar, i, j, k, nvar, n1, n2, n3);
-                        U.d0[ivar] = Am1 * v.d0[indx];                    /* U*/
-                        U.d1[ivar] = v.d0[indx] + Am1 * v.d1[indx];       /* U_A*/
-                        U.d2[ivar] = Am1 * v.d2[indx];                    /* U_B*/
-                        U.d3[ivar] = Am1 * v.d3[indx];                    /* U_3*/
-                        U.d11[ivar] = 2 * v.d1[indx] + Am1 * v.d11[indx]; /* U_AA*/
-                        U.d12[ivar] = v.d2[indx] + Am1 * v.d12[indx];     /* U_AB*/
-                        U.d13[ivar] = v.d3[indx] + Am1 * v.d13[indx];     /* U_AB*/
-                        U.d22[ivar] = Am1 * v.d22[indx];                  /* U_BB*/
-                        U.d23[ivar] = Am1 * v.d23[indx];                  /* U_B3*/
-                        U.d33[ivar] = Am1 * v.d33[indx];                  /* U_33*/
+                        U.d0[ivar] = Am1 * v.d0[indx];              /* U*/
+                        U.d1[ivar] = v.d0[indx] + Am1 * v.d1[indx]; /* U_A*/
+                        U.d2[ivar] = Am1 * v.d2[indx];              /* U_B*/
+                        U.d3[ivar] = Am1 * v.d3[indx];              /* U_3*/
+                        U.d11[ivar] =
+                            2 * v.d1[indx] + Am1 * v.d11[indx];       /* U_AA*/
+                        U.d12[ivar] = v.d2[indx] + Am1 * v.d12[indx]; /* U_AB*/
+                        U.d13[ivar] = v.d3[indx] + Am1 * v.d13[indx]; /* U_AB*/
+                        U.d22[ivar] = Am1 * v.d22[indx];              /* U_BB*/
+                        U.d23[ivar] = Am1 * v.d23[indx];              /* U_B3*/
+                        U.d33[ivar] = Am1 * v.d33[indx];              /* U_33*/
                     }
                     /* Calculation of (X,R) and*/
                     /* (U_X, U_R, U_3, U_XX, U_XR, U_X3, U_RR, U_R3, U_33)*/
@@ -242,19 +221,18 @@ void F_of_v(int nvar, int n1, int n2, int n3, derivs v, CCTK_REAL *F, derivs u)
                     C_To_c(nvar, X, R, &(s_x[i3D]), &r, U);
                     /* Calculation of (y,z) and*/
                     /* (U, U_x, U_y, U_z, U_xx, U_xy, U_xz, U_yy, U_yz, U_zz)*/
-                    rx3_To_xyz(nvar, s_x[i3D], r, phi, &(s_y[i3D]), &(s_z[i3D]), U);
+                    rx3_To_xyz(nvar, s_x[i3D], r, phi, &(s_y[i3D]), &(s_z[i3D]),
+                               U);
 
                     free_dvector(values, 0, nvar - 1);
                     free_derivs(&U, nvar);
                 }
         printf("This code not set up for sources.\n");
-        //Set_Rho_ADM(cctkGH, n1*n2*n3, sources, s_x, s_y, s_z);
+        // Set_Rho_ADM(cctkGH, n1*n2*n3, sources, s_x, s_y, s_z);
         free(s_z);
         free(s_y);
         free(s_x);
-    }
-    else
-    {
+    } else {
 #pragma omp parallel for num_threads(TP_OMP_THREADS) collapse(3)
         for (int i = 0; i < n1; i++)
             for (int j = 0; j < n2; j++)
@@ -265,19 +243,18 @@ void F_of_v(int nvar, int n1, int n2, int n3, derivs v, CCTK_REAL *F, derivs u)
     Derivatives_AB3(nvar, n1, n2, n3, v);
     CCTK_REAL psi, psi2, psi4, psi7, r_plus, r_minus;
     FILE *debugfile = NULL;
-    //if (do_residuum_debug_output && CCTK_MyProc(cctkGH) == 0)
-    if (TPID::do_residuum_debug_output == 0)
-    {
+    // if (do_residuum_debug_output && CCTK_MyProc(cctkGH) == 0)
+    if (TPID::do_residuum_debug_output == 0) {
         debugfile = fopen("res.dat", "w");
         assert(debugfile);
     }
 
-// Note: You cannot omp parallel collapse this loop there is some data dep. that I am not sure of. (I think some deriv computations going on. ) - Milinda.
+// Note: You cannot omp parallel collapse this loop there is some data dep. that
+// I am not sure of. (I think some deriv computations going on. ) - Milinda.
 #pragma omp parallel for num_threads(TP_OMP_THREADS) collapse(3)
     for (int i = 0; i < n1; i++)
         for (int j = 0; j < n2; j++)
-            for (int k = 0; k < n3; k++)
-            {
+            for (int k = 0; k < n3; k++) {
                 CCTK_REAL al, be, A, B, X, R, x, r, phi, y, z, Am1;
                 al = Pih * (2 * i + 1) / n1;
                 A = -cos(al);
@@ -292,8 +269,7 @@ void F_of_v(int nvar, int n1, int n2, int n3, derivs v, CCTK_REAL *F, derivs u)
                 values = dvector(0, nvar - 1);
                 allocate_derivs(&U, nvar);
 
-                for (int ivar = 0; ivar < nvar; ivar++)
-                {
+                for (int ivar = 0; ivar < nvar; ivar++) {
                     int indx = Index(ivar, i, j, k, nvar, n1, n2, n3);
                     U.d0[ivar] = Am1 * v.d0[indx];                    /* U*/
                     U.d1[ivar] = v.d0[indx] + Am1 * v.d1[indx];       /* U_A*/
@@ -315,10 +291,9 @@ void F_of_v(int nvar, int n1, int n2, int n3, derivs v, CCTK_REAL *F, derivs u)
                 /* Calculation of (y,z) and*/
                 /* (U, U_x, U_y, U_z, U_xx, U_xy, U_xz, U_yy, U_yz, U_zz)*/
                 rx3_To_xyz(nvar, x, r, phi, &y, &z, U);
-                NonLinEquations(sources[Index(0, i, j, k, 1, n1, n2, n3)],
-                                A, B, X, R, x, r, phi, y, z, U, values);
-                for (int ivar = 0; ivar < nvar; ivar++)
-                {
+                NonLinEquations(sources[Index(0, i, j, k, 1, n1, n2, n3)], A, B,
+                                X, R, x, r, phi, y, z, U, values);
+                for (int ivar = 0; ivar < nvar; ivar++) {
                     int indx = Index(ivar, i, j, k, nvar, n1, n2, n3);
                     F[indx] = values[ivar] * FAC;
                     /* if ((i<5) && ((j<5) || (j>n2-5)))*/
@@ -344,22 +319,20 @@ void F_of_v(int nvar, int n1, int n2, int n3, derivs v, CCTK_REAL *F, derivs u)
 }
 
 /* --------------------------------------------------------------------------*/
-void J_times_dv(int nvar, int n1, int n2, int n3, derivs dv, CCTK_REAL *Jdv, derivs u)
-{
+void J_times_dv(int nvar, int n1, int n2, int n3, derivs dv, CCTK_REAL *Jdv,
+                derivs u) {
     /* Calculates the left hand sides of the non-linear equations F_m(v_n)=0*/
     /* and the function u (u.d0[]) as well as its derivatives*/
-    /* (u.d1[], u.d2[], u.d3[], u.d11[], u.d12[], u.d13[], u.d22[], u.d23[], u.d33[])*/
+    /* (u.d1[], u.d2[], u.d3[], u.d11[], u.d12[], u.d13[], u.d22[], u.d23[],
+     * u.d33[])*/
     /* at interior points and at the boundaries "+/-"*/
 
     Derivatives_AB3(nvar, n1, n2, n3, dv);
 
 #pragma omp parallel for num_threads(TP_OMP_THREADS) collapse(3)
-    for (int i = 0; i < n1; i++)
-    {
-        for (int j = 0; j < n2; j++)
-        {
-            for (int k = 0; k < n3; k++)
-            {
+    for (int i = 0; i < n1; i++) {
+        for (int j = 0; j < n2; j++) {
+            for (int k = 0; k < n3; k++) {
                 CCTK_REAL al, be, A, B, X, R, x, r, phi, y, z, Am1, *values;
                 values = dvector(0, nvar - 1);
                 derivs dU, U;
@@ -373,42 +346,44 @@ void J_times_dv(int nvar, int n1, int n2, int n3, derivs dv, CCTK_REAL *Jdv, der
                 phi = 2. * Pi * k / n3;
 
                 Am1 = A - 1;
-                for (int ivar = 0; ivar < nvar; ivar++)
-                {
+                for (int ivar = 0; ivar < nvar; ivar++) {
                     int indx = Index(ivar, i, j, k, nvar, n1, n2, n3);
-                    dU.d0[ivar] = Am1 * dv.d0[indx];                     /* dU*/
-                    dU.d1[ivar] = dv.d0[indx] + Am1 * dv.d1[indx];       /* dU_A*/
-                    dU.d2[ivar] = Am1 * dv.d2[indx];                     /* dU_B*/
-                    dU.d3[ivar] = Am1 * dv.d3[indx];                     /* dU_3*/
-                    dU.d11[ivar] = 2 * dv.d1[indx] + Am1 * dv.d11[indx]; /* dU_AA*/
-                    dU.d12[ivar] = dv.d2[indx] + Am1 * dv.d12[indx];     /* dU_AB*/
-                    dU.d13[ivar] = dv.d3[indx] + Am1 * dv.d13[indx];     /* dU_AB*/
-                    dU.d22[ivar] = Am1 * dv.d22[indx];                   /* dU_BB*/
-                    dU.d23[ivar] = Am1 * dv.d23[indx];                   /* dU_B3*/
-                    dU.d33[ivar] = Am1 * dv.d33[indx];                   /* dU_33*/
-                    U.d0[ivar] = u.d0[indx];                             /* U   */
-                    U.d1[ivar] = u.d1[indx];                             /* U_x*/
-                    U.d2[ivar] = u.d2[indx];                             /* U_y*/
-                    U.d3[ivar] = u.d3[indx];                             /* U_z*/
-                    U.d11[ivar] = u.d11[indx];                           /* U_xx*/
-                    U.d12[ivar] = u.d12[indx];                           /* U_xy*/
-                    U.d13[ivar] = u.d13[indx];                           /* U_xz*/
-                    U.d22[ivar] = u.d22[indx];                           /* U_yy*/
-                    U.d23[ivar] = u.d23[indx];                           /* U_yz*/
-                    U.d33[ivar] = u.d33[indx];                           /* U_zz*/
+                    dU.d0[ivar] = Am1 * dv.d0[indx];               /* dU*/
+                    dU.d1[ivar] = dv.d0[indx] + Am1 * dv.d1[indx]; /* dU_A*/
+                    dU.d2[ivar] = Am1 * dv.d2[indx];               /* dU_B*/
+                    dU.d3[ivar] = Am1 * dv.d3[indx];               /* dU_3*/
+                    dU.d11[ivar] =
+                        2 * dv.d1[indx] + Am1 * dv.d11[indx];        /* dU_AA*/
+                    dU.d12[ivar] = dv.d2[indx] + Am1 * dv.d12[indx]; /* dU_AB*/
+                    dU.d13[ivar] = dv.d3[indx] + Am1 * dv.d13[indx]; /* dU_AB*/
+                    dU.d22[ivar] = Am1 * dv.d22[indx];               /* dU_BB*/
+                    dU.d23[ivar] = Am1 * dv.d23[indx];               /* dU_B3*/
+                    dU.d33[ivar] = Am1 * dv.d33[indx];               /* dU_33*/
+                    U.d0[ivar] = u.d0[indx];                         /* U   */
+                    U.d1[ivar] = u.d1[indx];                         /* U_x*/
+                    U.d2[ivar] = u.d2[indx];                         /* U_y*/
+                    U.d3[ivar] = u.d3[indx];                         /* U_z*/
+                    U.d11[ivar] = u.d11[indx];                       /* U_xx*/
+                    U.d12[ivar] = u.d12[indx];                       /* U_xy*/
+                    U.d13[ivar] = u.d13[indx];                       /* U_xz*/
+                    U.d22[ivar] = u.d22[indx];                       /* U_yy*/
+                    U.d23[ivar] = u.d23[indx];                       /* U_yz*/
+                    U.d33[ivar] = u.d33[indx];                       /* U_zz*/
                 }
                 /* Calculation of (X,R) and*/
-                /* (dU_X, dU_R, dU_3, dU_XX, dU_XR, dU_X3, dU_RR, dU_R3, dU_33)*/
+                /* (dU_X, dU_R, dU_3, dU_XX, dU_XR, dU_X3, dU_RR, dU_R3,
+                 * dU_33)*/
                 AB_To_XR(nvar, A, B, &X, &R, dU);
                 /* Calculation of (x,r) and*/
-                /* (dU, dU_x, dU_r, dU_3, dU_xx, dU_xr, dU_x3, dU_rr, dU_r3, dU_33)*/
+                /* (dU, dU_x, dU_r, dU_3, dU_xx, dU_xr, dU_x3, dU_rr, dU_r3,
+                 * dU_33)*/
                 C_To_c(nvar, X, R, &x, &r, dU);
                 /* Calculation of (y,z) and*/
-                /* (dU, dU_x, dU_y, dU_z, dU_xx, dU_xy, dU_xz, dU_yy, dU_yz, dU_zz)*/
+                /* (dU, dU_x, dU_y, dU_z, dU_xx, dU_xy, dU_xz, dU_yy, dU_yz,
+                 * dU_zz)*/
                 rx3_To_xyz(nvar, x, r, phi, &y, &z, dU);
                 LinEquations(A, B, X, R, x, r, phi, y, z, dU, U, values);
-                for (int ivar = 0; ivar < nvar; ivar++)
-                {
+                for (int ivar = 0; ivar < nvar; ivar++) {
                     int indx = Index(ivar, i, j, k, nvar, n1, n2, n3);
                     Jdv[indx] = values[ivar] * FAC;
                 }
@@ -422,27 +397,27 @@ void J_times_dv(int nvar, int n1, int n2, int n3, derivs dv, CCTK_REAL *Jdv, der
 }
 
 /* --------------------------------------------------------------------------*/
-void JFD_times_dv(int i, int j, int k, int nvar, int n1, int n2, int n3, derivs dv, derivs u, CCTK_REAL *values)
-{
+void JFD_times_dv(int i, int j, int k, int nvar, int n1, int n2, int n3,
+                  derivs dv, derivs u, CCTK_REAL *values) {
     /* Calculates rows of the vector 'J(FD)*dv'.*/
-    /* First row to be calculated: row = Index(0,      i, j, k; nvar, n1, n2, n3)*/
-    /* Last  row to be calculated: row = Index(nvar-1, i, j, k; nvar, n1, n2, n3)*/
+    /* First row to be calculated: row = Index(0,      i, j, k; nvar, n1, n2,
+     * n3)*/
+    /* Last  row to be calculated: row = Index(nvar-1, i, j, k; nvar, n1, n2,
+     * n3)*/
     /* These rows are stored in the vector JFDdv[0] ... JFDdv[nvar-1].*/
     int ivar, indx;
     CCTK_REAL al, be, A, B, X, R, x, r, phi, y, z, Am1;
     CCTK_REAL sin_al, sin_al_i1, sin_al_i2, sin_al_i3, cos_al;
     CCTK_REAL sin_be, sin_be_i1, sin_be_i2, sin_be_i3, cos_be;
-    CCTK_REAL dV0, dV1, dV2, dV3, dV11, dV12, dV13, dV22, dV23, dV33,
-        ha, ga, ga2, hb, gb, gb2, hp, gp, gp2, gagb, gagp, gbgp;
+    CCTK_REAL dV0, dV1, dV2, dV3, dV11, dV12, dV13, dV22, dV23, dV33, ha, ga,
+        ga2, hb, gb, gb2, hp, gp, gp2, gagb, gagp, gbgp;
     derivs dU, U;
 
     allocate_derivs(&dU, nvar);
     allocate_derivs(&U, nvar);
 
-    if (k < 0)
-        k = k + n3;
-    if (k >= n3)
-        k = k - n3;
+    if (k < 0) k = k + n3;
+    if (k >= n3) k = k - n3;
 
     ha = Pi / n1; /* ha: Stepsize with respect to (al)*/
     al = ha * (i + 0.5);
@@ -476,8 +451,7 @@ void JFD_times_dv(int i, int j, int k, int nvar, int n1, int n2, int n3, derivs 
     cos_be = -B;
 
     Am1 = A - 1;
-    for (ivar = 0; ivar < nvar; ivar++)
-    {
+    for (ivar = 0; ivar < nvar; ivar++) {
         int iccc = Index(ivar, i, j, k, nvar, n1, n2, n3),
             ipcc = Index(ivar, i + 1, j, k, nvar, n1, n2, n3),
             imcc = Index(ivar, i - 1, j, k, nvar, n1, n2, n3),
@@ -505,12 +479,12 @@ void JFD_times_dv(int i, int j, int k, int nvar, int n1, int n2, int n3, derivs 
         dV11 = ga2 * (dv.d0[ipcc] + dv.d0[imcc] - 2 * dv.d0[iccc]);
         dV22 = gb2 * (dv.d0[icpc] + dv.d0[icmc] - 2 * dv.d0[iccc]);
         dV33 = gp2 * (dv.d0[iccp] + dv.d0[iccm] - 2 * dv.d0[iccc]);
-        dV12 =
-            0.25 * gagb * (dv.d0[ippc] - dv.d0[ipmc] + dv.d0[immc] - dv.d0[impc]);
-        dV13 =
-            0.25 * gagp * (dv.d0[ipcp] - dv.d0[imcp] + dv.d0[imcm] - dv.d0[ipcm]);
-        dV23 =
-            0.25 * gbgp * (dv.d0[icpp] - dv.d0[icpm] + dv.d0[icmm] - dv.d0[icmp]);
+        dV12 = 0.25 * gagb *
+               (dv.d0[ippc] - dv.d0[ipmc] + dv.d0[immc] - dv.d0[impc]);
+        dV13 = 0.25 * gagp *
+               (dv.d0[ipcp] - dv.d0[imcp] + dv.d0[imcm] - dv.d0[ipcm]);
+        dV23 = 0.25 * gbgp *
+               (dv.d0[icpp] - dv.d0[icpm] + dv.d0[icmm] - dv.d0[icmp]);
         /* Derivatives of (dv) w.r.t. (A,B,phi):*/
         dV11 = sin_al_i3 * (sin_al * dV11 - cos_al * dV1);
         dV12 = sin_al_i1 * sin_be_i1 * dV12;
@@ -553,16 +527,15 @@ void JFD_times_dv(int i, int j, int k, int nvar, int n1, int n2, int n3, derivs 
     /* (dU, dU_x, dU_y, dU_z, dU_xx, dU_xy, dU_xz, dU_yy, dU_yz, dU_zz)*/
     rx3_To_xyz(nvar, x, r, phi, &y, &z, dU);
     LinEquations(A, B, X, R, x, r, phi, y, z, dU, U, values);
-    for (ivar = 0; ivar < nvar; ivar++)
-        values[ivar] *= FAC;
+    for (ivar = 0; ivar < nvar; ivar++) values[ivar] *= FAC;
 
     free_derivs(&dU, nvar);
     free_derivs(&U, nvar);
 }
 
 /* --------------------------------------------------------------------------*/
-void SetMatrix_JFD(int nvar, int n1, int n2, int n3, derivs u, int *ncols, int **cols, CCTK_REAL **Matrix)
-{
+void SetMatrix_JFD(int nvar, int n1, int n2, int n3, derivs u, int *ncols,
+                   int **cols, CCTK_REAL **Matrix) {
     int N1, N2, N3;
     int ntotal = nvar * n1 * n2 * n3;
     CCTK_REAL *values;
@@ -578,21 +551,16 @@ void SetMatrix_JFD(int nvar, int n1, int n2, int n3, derivs u, int *ncols, int *
     for (int i = 0; i < n1; i++)
         for (int j = 0; j < n2; j++)
             for (int k = 0; k < n3; k++)
-                for (int ivar = 0; ivar < nvar; ivar++)
-                {
+                for (int ivar = 0; ivar < nvar; ivar++) {
                     int row = Index(ivar, i, j, k, nvar, n1, n2, n3);
                     ncols[row] = 0;
                     dv.d0[row] = 0;
                 }
 
-    for (int i = 0; i < n1; i++)
-    {
-        for (int j = 0; j < n2; j++)
-        {
-            for (int k = 0; k < n3; k++)
-            {
-                for (int ivar = 0; ivar < nvar; ivar++)
-                {
+    for (int i = 0; i < n1; i++) {
+        for (int j = 0; j < n2; j++) {
+            for (int k = 0; k < n3; k++) {
+                for (int ivar = 0; ivar < nvar; ivar++) {
                     int column = Index(ivar, i, j, k, nvar, n1, n2, n3);
                     dv.d0[column] = 1;
 
@@ -603,24 +571,21 @@ void SetMatrix_JFD(int nvar, int n1, int n2, int n3, derivs u, int *ncols, int *
                     int k_0 = k - 1;
                     int k_1 = k + 1;
                     /*i_0 = 0;
-					i_1 = N1;
-					j_0 = 0;
-					j_1 = N2;
-					k_0 = 0;
-					k_1 = N3;*/
+                                        i_1 = N1;
+                                        j_0 = 0;
+                                        j_1 = N2;
+                                        k_0 = 0;
+                                        k_1 = N3;*/
 
-                    for (int i1 = i_0; i1 <= i_1; i1++)
-                    {
-                        for (int j1 = j_0; j1 <= j_1; j1++)
-                        {
-                            for (int k1 = k_0; k1 <= k_1; k1++)
-                            {
-                                JFD_times_dv(i1, j1, k1, nvar, n1, n2, n3, dv, u, values);
-                                for (int ivar1 = 0; ivar1 < nvar; ivar1++)
-                                {
-                                    if (values[ivar1] != 0)
-                                    {
-                                        int row = Index(ivar1, i1, j1, k1, nvar, n1, n2, n3);
+                    for (int i1 = i_0; i1 <= i_1; i1++) {
+                        for (int j1 = j_0; j1 <= j_1; j1++) {
+                            for (int k1 = k_0; k1 <= k_1; k1++) {
+                                JFD_times_dv(i1, j1, k1, nvar, n1, n2, n3, dv,
+                                             u, values);
+                                for (int ivar1 = 0; ivar1 < nvar; ivar1++) {
+                                    if (values[ivar1] != 0) {
+                                        int row = Index(ivar1, i1, j1, k1, nvar,
+                                                        n1, n2, n3);
                                         int mcol = ncols[row];
                                         cols[row][mcol] = column;
                                         Matrix[row][mcol] = values[ivar1];
@@ -642,8 +607,9 @@ void SetMatrix_JFD(int nvar, int n1, int n2, int n3, derivs u, int *ncols, int *
 
 /* --------------------------------------------------------------------------*/
 /* Calculates the value of v at an arbitrary position (A,B,phi)*/
-CCTK_REAL PunctEvalAtArbitPosition(CCTK_REAL *v, int ivar, CCTK_REAL A, CCTK_REAL B, CCTK_REAL phi, int nvar, int n1, int n2, int n3)
-{
+CCTK_REAL PunctEvalAtArbitPosition(CCTK_REAL *v, int ivar, CCTK_REAL A,
+                                   CCTK_REAL B, CCTK_REAL phi, int nvar, int n1,
+                                   int n2, int n3) {
     int i, j, k, N;
     CCTK_REAL *p, *values1, **values2, result;
 
@@ -652,10 +618,8 @@ CCTK_REAL PunctEvalAtArbitPosition(CCTK_REAL *v, int ivar, CCTK_REAL A, CCTK_REA
     values1 = dvector(0, N);
     values2 = dmatrix(0, N, 0, N);
 
-    for (k = 0; k < n3; k++)
-    {
-        for (j = 0; j < n2; j++)
-        {
+    for (k = 0; k < n3; k++) {
+        for (j = 0; j < n2; j++) {
             for (i = 0; i < n1; i++)
                 p[i] = v[ivar + nvar * (i + n1 * (j + n2 * k))];
             chebft_Zeros(p, n1, 0);
@@ -663,10 +627,8 @@ CCTK_REAL PunctEvalAtArbitPosition(CCTK_REAL *v, int ivar, CCTK_REAL A, CCTK_REA
         }
     }
 
-    for (k = 0; k < n3; k++)
-    {
-        for (j = 0; j < n2; j++)
-            p[j] = values2[j][k];
+    for (k = 0; k < n3; k++) {
+        for (j = 0; j < n2; j++) p[j] = values2[j][k];
         chebft_Zeros(p, n2, 0);
         values1[k] = chebev(-1, 1, p, n2, B);
     }
@@ -683,8 +645,7 @@ CCTK_REAL PunctEvalAtArbitPosition(CCTK_REAL *v, int ivar, CCTK_REAL A, CCTK_REA
 
 /* --------------------------------------------------------------------------*/
 void calculate_derivs(int i, int j, int k, int ivar, int nvar, int n1, int n2,
-                      int n3, derivs v, derivs vv)
-{
+                      int n3, derivs v, derivs vv) {
     CCTK_REAL al = Pih * (2 * i + 1) / n1, be = Pih * (2 * j + 1) / n2,
               sin_al = sin(al), sin2_al = sin_al * sin_al, cos_al = cos(al),
               sin_be = sin(be), sin2_be = sin_be * sin_be, cos_be = cos(be);
@@ -693,37 +654,35 @@ void calculate_derivs(int i, int j, int k, int ivar, int nvar, int n1, int n2,
     vv.d1[0] = v.d1[Index(ivar, i, j, k, nvar, n1, n2, n3)] * sin_al;
     vv.d2[0] = v.d2[Index(ivar, i, j, k, nvar, n1, n2, n3)] * sin_be;
     vv.d3[0] = v.d3[Index(ivar, i, j, k, nvar, n1, n2, n3)];
-    vv.d11[0] = v.d11[Index(ivar, i, j, k, nvar, n1, n2, n3)] * sin2_al + v.d1[Index(ivar, i, j, k, nvar, n1, n2, n3)] * cos_al;
-    vv.d12[0] =
-        v.d12[Index(ivar, i, j, k, nvar, n1, n2, n3)] * sin_al * sin_be;
+    vv.d11[0] = v.d11[Index(ivar, i, j, k, nvar, n1, n2, n3)] * sin2_al +
+                v.d1[Index(ivar, i, j, k, nvar, n1, n2, n3)] * cos_al;
+    vv.d12[0] = v.d12[Index(ivar, i, j, k, nvar, n1, n2, n3)] * sin_al * sin_be;
     vv.d13[0] = v.d13[Index(ivar, i, j, k, nvar, n1, n2, n3)] * sin_al;
-    vv.d22[0] = v.d22[Index(ivar, i, j, k, nvar, n1, n2, n3)] * sin2_be + v.d2[Index(ivar, i, j, k, nvar, n1, n2, n3)] * cos_be;
+    vv.d22[0] = v.d22[Index(ivar, i, j, k, nvar, n1, n2, n3)] * sin2_be +
+                v.d2[Index(ivar, i, j, k, nvar, n1, n2, n3)] * cos_be;
     vv.d23[0] = v.d23[Index(ivar, i, j, k, nvar, n1, n2, n3)] * sin_be;
     vv.d33[0] = v.d33[Index(ivar, i, j, k, nvar, n1, n2, n3)];
 }
 
 /* --------------------------------------------------------------------------*/
 CCTK_REAL
-interpol(CCTK_REAL a, CCTK_REAL b, CCTK_REAL c, derivs v)
-{
-    return v.d0[0] + a * v.d1[0] + b * v.d2[0] + c * v.d3[0] + 0.5 * a * a * v.d11[0] + a * b * v.d12[0] + a * c * v.d13[0] + 0.5 * b * b * v.d22[0] + b * c * v.d23[0] + 0.5 * c * c * v.d33[0];
+interpol(CCTK_REAL a, CCTK_REAL b, CCTK_REAL c, derivs v) {
+    return v.d0[0] + a * v.d1[0] + b * v.d2[0] + c * v.d3[0] +
+           0.5 * a * a * v.d11[0] + a * b * v.d12[0] + a * c * v.d13[0] +
+           0.5 * b * b * v.d22[0] + b * c * v.d23[0] + 0.5 * c * c * v.d33[0];
 }
 
 /* --------------------------------------------------------------------------*/
-static CCTK_REAL
-clamp_pm_one(CCTK_REAL val)
-{
-    return val < -1 ? -1 : val > 1 ? 1
-                                   : val;
+static CCTK_REAL clamp_pm_one(CCTK_REAL val) {
+    return val < -1 ? -1 : val > 1 ? 1 : val;
 }
 
 /* --------------------------------------------------------------------------*/
 /* Calculates the value of v at an arbitrary position (x,y,z)*/
 CCTK_REAL
-PunctTaylorExpandAtArbitPosition(int ivar, int nvar, int n1,
-                                 int n2, int n3, derivs v, CCTK_REAL x, CCTK_REAL y,
-                                 CCTK_REAL z)
-{
+PunctTaylorExpandAtArbitPosition(int ivar, int nvar, int n1, int n2, int n3,
+                                 derivs v, CCTK_REAL x, CCTK_REAL y,
+                                 CCTK_REAL z) {
     CCTK_REAL xs, ys, zs, rs2, phi, X, R, A, B, al, be, aux1, aux2, a, b, c,
         result, Ui;
     int i, j, k;
@@ -735,8 +694,7 @@ PunctTaylorExpandAtArbitPosition(int ivar, int nvar, int n1,
     zs = z / TPID::par_b;
     rs2 = ys * ys + zs * zs;
     phi = atan2(z, y);
-    if (phi < 0)
-        phi += 2 * Pi;
+    if (phi < 0) phi += 2 * Pi;
 
     aux1 = 0.5 * (xs * xs + rs2 - 1);
     aux2 = sqrt(aux1 * aux1 + rs2);
@@ -744,13 +702,12 @@ PunctTaylorExpandAtArbitPosition(int ivar, int nvar, int n1,
 
     /* Note: Range of R = asin(Q) is [0,pi] for Q in [0,1] */
     R = asin(min(1.0, sqrt(-aux1 + aux2)));
-    if (x < 0)
-        R = Pi - R;
+    if (x < 0) R = Pi - R;
 
     A = clamp_pm_one(2 * tanh(0.5 * X) - 1);
 
     /* Note: Range of R/2 - pi/4 is [ -pi/4, pi/4 ] and so range of tan
-   * is [-1,1], for R in [0,pi]. */
+     * is [-1,1], for R in [0,pi]. */
     B = clamp_pm_one(tan(0.5 * R - Piq));
     al = Pi - acos(A);
     be = Pi - acos(B);
@@ -777,10 +734,8 @@ PunctTaylorExpandAtArbitPosition(int ivar, int nvar, int n1,
 /* --------------------------------------------------------------------------*/
 /* Calculates the value of v at an arbitrary position (x,y,z)*/
 CCTK_REAL
-PunctIntPolAtArbitPosition(int ivar, int nvar, int n1,
-                           int n2, int n3, derivs v, CCTK_REAL x, CCTK_REAL y,
-                           CCTK_REAL z)
-{
+PunctIntPolAtArbitPosition(int ivar, int nvar, int n1, int n2, int n3, derivs v,
+                           CCTK_REAL x, CCTK_REAL y, CCTK_REAL z) {
     CCTK_REAL xs, ys, zs, rs2, phi, X, R, A, B, aux1, aux2, result, Ui;
 
     xs = x / TPID::par_b;
@@ -788,15 +743,13 @@ PunctIntPolAtArbitPosition(int ivar, int nvar, int n1,
     zs = z / TPID::par_b;
     rs2 = ys * ys + zs * zs;
     phi = atan2(z, y);
-    if (phi < 0)
-        phi += 2 * Pi;
+    if (phi < 0) phi += 2 * Pi;
 
     aux1 = 0.5 * (xs * xs + rs2 - 1);
     aux2 = sqrt(aux1 * aux1 + rs2);
     X = asinh(sqrt(aux1 + aux2));
     R = asin(min(1.0, sqrt(-aux1 + aux2)));
-    if (x < 0)
-        R = Pi - R;
+    if (x < 0) R = Pi - R;
 
     A = 2 * tanh(0.5 * X) - 1;
     B = tan(0.5 * R - Piq);
@@ -814,13 +767,15 @@ PunctIntPolAtArbitPosition(int ivar, int nvar, int n1,
 /// Fast Spectral Interpolation Routine Stuff
 //////////////////////////////////////////////////////
 
-/* Calculates the value of v at an arbitrary position (A,B,phi)* using the fast routine */
+/* Calculates the value of v at an arbitrary position (A,B,phi)* using the fast
+ * routine */
 CCTK_REAL
-PunctEvalAtArbitPositionFast(CCTK_REAL *v, int ivar, CCTK_REAL A, CCTK_REAL B, CCTK_REAL phi, int nvar, int n1, int n2, int n3)
-{
+PunctEvalAtArbitPositionFast(CCTK_REAL *v, int ivar, CCTK_REAL A, CCTK_REAL B,
+                             CCTK_REAL phi, int nvar, int n1, int n2, int n3) {
     int i, j, k, N;
     CCTK_REAL *p, *values1, **values2, result;
-    // VASILIS: Nothing should be changed in this routine. This is used by PunctIntPolAtArbitPositionFast
+    // VASILIS: Nothing should be changed in this routine. This is used by
+    // PunctIntPolAtArbitPositionFast
 
     N = maximum3(n1, n2, n3);
 
@@ -828,10 +783,8 @@ PunctEvalAtArbitPositionFast(CCTK_REAL *v, int ivar, CCTK_REAL A, CCTK_REAL B, C
     values1 = dvector(0, N);
     values2 = dmatrix(0, N, 0, N);
 
-    for (k = 0; k < n3; k++)
-    {
-        for (j = 0; j < n2; j++)
-        {
+    for (k = 0; k < n3; k++) {
+        for (j = 0; j < n2; j++) {
             for (i = 0; i < n1; i++)
                 p[i] = v[ivar + nvar * (i + n1 * (j + n2 * k))];
             //      chebft_Zeros (p, n1, 0);
@@ -839,10 +792,8 @@ PunctEvalAtArbitPositionFast(CCTK_REAL *v, int ivar, CCTK_REAL A, CCTK_REAL B, C
         }
     }
 
-    for (k = 0; k < n3; k++)
-    {
-        for (j = 0; j < n2; j++)
-            p[j] = values2[j][k];
+    for (k = 0; k < n3; k++) {
+        for (j = 0; j < n2; j++) p[j] = values2[j][k];
         //    chebft_Zeros (p, n2, 0);
         values1[k] = chebev(-1, 1, p, n2, B);
     }
@@ -860,35 +811,35 @@ PunctEvalAtArbitPositionFast(CCTK_REAL *v, int ivar, CCTK_REAL A, CCTK_REAL B, C
 }
 
 // --------------------------------------------------------------------------*/
-// Calculates the value of v at an arbitrary position (x,y,z) if the spectral coefficients are known //
+// Calculates the value of v at an arbitrary position (x,y,z) if the spectral
+// coefficients are known //
 /* --------------------------------------------------------------------------*/
 CCTK_REAL
-PunctIntPolAtArbitPositionFast(int ivar, int nvar, int n1,
-                               int n2, int n3, derivs v, CCTK_REAL x, CCTK_REAL y,
-                               CCTK_REAL z)
-{
+PunctIntPolAtArbitPositionFast(int ivar, int nvar, int n1, int n2, int n3,
+                               derivs v, CCTK_REAL x, CCTK_REAL y,
+                               CCTK_REAL z) {
     CCTK_REAL xs, ys, zs, rs2, phi, X, R, A, B, aux1, aux2, result, Ui;
-    // VASILIS: Here the struct derivs v refers to the spectral coeffiecients of variable v not the variable v itself
+    // VASILIS: Here the struct derivs v refers to the spectral coeffiecients of
+    // variable v not the variable v itself
 
     xs = x / TPID::par_b;
     ys = y / TPID::par_b;
     zs = z / TPID::par_b;
     rs2 = ys * ys + zs * zs;
     phi = atan2(z, y);
-    if (phi < 0)
-        phi += 2 * Pi;
+    if (phi < 0) phi += 2 * Pi;
 
     aux1 = 0.5 * (xs * xs + rs2 - 1);
     aux2 = sqrt(aux1 * aux1 + rs2);
     X = asinh(sqrt(aux1 + aux2));
     R = asin(min(1.0, sqrt(-aux1 + aux2)));
-    if (x < 0)
-        R = Pi - R;
+    if (x < 0) R = Pi - R;
 
     A = 2 * tanh(0.5 * X) - 1;
     B = tan(0.5 * R - Piq);
 
-    result = PunctEvalAtArbitPositionFast(v.d0, ivar, A, B, phi, nvar, n1, n2, n3);
+    result =
+        PunctEvalAtArbitPositionFast(v.d0, ivar, A, B, phi, nvar, n1, n2, n3);
 
     Ui = (A - 1) * result;
 
@@ -896,9 +847,10 @@ PunctIntPolAtArbitPositionFast(int ivar, int nvar, int n1,
 }
 
 // Evaluates the spectral expansion coefficients of v
-void SpecCoef(int n1, int n2, int n3, int ivar, CCTK_REAL *v, CCTK_REAL *cf)
-{
-    // VASILIS: Here v is a pointer to the values of the variable v at the collocation points and cf_v a pointer to the spectral coefficients that this routine calculates
+void SpecCoef(int n1, int n2, int n3, int ivar, CCTK_REAL *v, CCTK_REAL *cf) {
+    // VASILIS: Here v is a pointer to the values of the variable v at the
+    // collocation points and cf_v a pointer to the spectral coefficients that
+    // this routine calculates
 
     int i, j, k, N, n, l;
     CCTK_REAL *p, ***values3, ***values4;
@@ -908,49 +860,39 @@ void SpecCoef(int n1, int n2, int n3, int ivar, CCTK_REAL *v, CCTK_REAL *cf)
     values3 = d3tensor(0, n1, 0, n2, 0, n3);
     values4 = d3tensor(0, n1, 0, n2, 0, n3);
 
-    // Caclulate values3[n,j,k] = a_n^{j,k} = (sum_i^(n1-1) f(A_i,B_j,phi_k) Tn(-A_i))/k_n , k_n = N/2 or N
-    for (k = 0; k < n3; k++)
-    {
-        for (j = 0; j < n2; j++)
-        {
-
-            for (i = 0; i < n1; i++)
-                p[i] = v[ivar + (i + n1 * (j + n2 * k))];
+    // Caclulate values3[n,j,k] = a_n^{j,k} = (sum_i^(n1-1) f(A_i,B_j,phi_k)
+    // Tn(-A_i))/k_n , k_n = N/2 or N
+    for (k = 0; k < n3; k++) {
+        for (j = 0; j < n2; j++) {
+            for (i = 0; i < n1; i++) p[i] = v[ivar + (i + n1 * (j + n2 * k))];
 
             chebft_Zeros(p, n1, 0);
-            for (n = 0; n < n1; n++)
-            {
+            for (n = 0; n < n1; n++) {
                 values3[n][j][k] = p[n];
             }
         }
     }
 
-    // Caclulate values4[n,l,k] = a_{n,l}^{k} = (sum_j^(n2-1) a_n^{j,k} Tn(B_j))/k_l , k_l = N/2 or N
+    // Caclulate values4[n,l,k] = a_{n,l}^{k} = (sum_j^(n2-1) a_n^{j,k}
+    // Tn(B_j))/k_l , k_l = N/2 or N
 
-    for (n = 0; n < n1; n++)
-    {
-        for (k = 0; k < n3; k++)
-        {
-            for (j = 0; j < n2; j++)
-                p[j] = values3[n][j][k];
+    for (n = 0; n < n1; n++) {
+        for (k = 0; k < n3; k++) {
+            for (j = 0; j < n2; j++) p[j] = values3[n][j][k];
             chebft_Zeros(p, n2, 0);
-            for (l = 0; l < n2; l++)
-            {
+            for (l = 0; l < n2; l++) {
                 values4[n][l][k] = p[l];
             }
         }
     }
 
-    // Caclulate coefficients  a_{n,l,m} = (sum_k^(n3-1) a_{n,m}^{k} fourier(phi_k))/k_m , k_m = N/2 or N
-    for (i = 0; i < n1; i++)
-    {
-        for (j = 0; j < n2; j++)
-        {
-            for (k = 0; k < n3; k++)
-                p[k] = values4[i][j][k];
+    // Caclulate coefficients  a_{n,l,m} = (sum_k^(n3-1) a_{n,m}^{k}
+    // fourier(phi_k))/k_m , k_m = N/2 or N
+    for (i = 0; i < n1; i++) {
+        for (j = 0; j < n2; j++) {
+            for (k = 0; k < n3; k++) p[k] = values4[i][j][k];
             fourft(p, n3, 0);
-            for (k = 0; k < n3; k++)
-            {
+            for (k = 0; k < n3; k++) {
                 cf[ivar + (i + n1 * (j + n2 * k))] = p[k];
             }
         }

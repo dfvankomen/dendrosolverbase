@@ -8,11 +8,11 @@
 # this is the general relativity definition file
 solver/include/grDef.h
 
-# physcon.cpp is the physical conditions file (deals with psi, ham, and mom)
-solver/src/physcon.cpp
-
 # RHS set-up for evolution equations:
 solver/src/rhs.cpp
+
+# physcon.cpp is the physical conditions file (deals with psi, ham, and mom)
+solver/src/physcon.cpp
 
 # and then the KO calculation to be used
 generated-files/solver_rhs_ko_deriv_calc.cpp.inc

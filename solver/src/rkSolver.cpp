@@ -726,7 +726,6 @@ void RK_SOLVER::zipVars(DendroScalar **uzipIn, DendroScalar **zipOut) {
 
 void RK_SOLVER::applyBoundaryConditions() {}
 
-
 // TODO: do the split into solver types like done in EMDA code
 void RK_SOLVER::performSingleIteration() {
     char frawName[256];
@@ -1368,7 +1367,8 @@ void RK_SOLVER::performSingleIteration() {
                                     m_uiPrevVar[index][node];
                                 for (unsigned int s = 0; s < (stage + 1); s++) {
                                     // if(!rank && index==0 && node==0)
-                                    // std::cout<<"rk stage: "<<stage<<" im coef:
+                                    // std::cout<<"rk stage: "<<stage<<" im
+                                    // coef:
                                     // "<<s<<" value:
                                     // "<<RK_U[stage+1][s]<<std::endl;
                                     m_uiVarIm[index][node] +=
@@ -2460,7 +2460,6 @@ void RK_SOLVER::restoreCheckPoint(const char *fNamePrefix, MPI_Comm comm) {
 
         dsolve::deallocate_deriv_workspace();
         dsolve::allocate_deriv_workspace(m_uiMesh, 1);
-
 
         reallocateMPIResources();
         if (restoreStatusGlobal == 0) break;

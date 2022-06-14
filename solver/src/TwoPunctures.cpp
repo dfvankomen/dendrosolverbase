@@ -1,28 +1,31 @@
 /* TwoPunctures:  File  "TwoPunctures.c"*/
 
+#include "TwoPunctures.h"
+
 #include <assert.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include <cmath>
-#include <ctype.h>
-#include "parameters.h"
+
 #include "grUtils.h"
-#include "TwoPunctures.h"
+#include "parameters.h"
 
 using namespace dsolve;
 
-inline double EXTEND(double M, double r)
-{
+inline double EXTEND(double M, double r) {
     return (M * (3. / 8 * pow(r, 4) / pow(TPID::TP_Extend_Radius, 5) -
                  5. / 4 * pow(r, 2) / pow(TPID::TP_Extend_Radius, 3) +
                  15. / 8 / TPID::TP_Extend_Radius));
 }
 
 /* -------------------------------------------------------------------*/
-void TwoPunctures(const double xx1, const double yy1, const double zz1, double *vars, double *mp, double *mm, double *mp_adm, double *mm_adm, double *E, double *J1, double *J2, double *J3)
-{
-
+void TwoPunctures(const double xx1, const double yy1, const double zz1,
+                  double *vars, double *mp, double *mm, double *mp_adm,
+                  double *mm_adm, double *E, double *J1, double *J2,
+                  double *J3) {
 // TODO: fix the TWO puncture code for ANYTHING!
 #if 0
 
@@ -361,22 +364,18 @@ void TwoPunctures(const double xx1, const double yy1, const double zz1, double *
         free_derivs(&cf_v, ntotal);
     }
 
-    #endif
+#endif
 }
 
-void TPStore(double *mp, double *mm, double *mp_adm, double *mm_adm, double *E, double *J1, double *J2, double *J3, const char *fprefix)
-{
-
+void TPStore(double *mp, double *mm, double *mp_adm, double *mm_adm, double *E,
+             double *J1, double *J2, double *J3, const char *fprefix) {
     *mp = TPID::par_m_plus;
     *mm = TPID::par_m_minus;
-    enum GRID_SETUP_METHOD
-    {
-        GSM_Taylor_expansion,
-        GSM_evaluation
-    };
+    enum GRID_SETUP_METHOD { GSM_Taylor_expansion, GSM_evaluation };
     enum GRID_SETUP_METHOD gsm;
     int antisymmetric_lapse, averaged_lapse, pmn_lapse, brownsville_lapse;
-    int const nvar = 1, n1 = TPID::npoints_A, n2 = TPID::npoints_B, n3 = TPID::npoints_phi;
+    int const nvar = 1, n1 = TPID::npoints_A, n2 = TPID::npoints_B,
+              n3 = TPID::npoints_phi;
     int const ntotal = n1 * n2 * n3 * nvar;
 
 #if 1
@@ -387,8 +386,7 @@ void TPStore(double *mp, double *mm, double *mp_adm, double *mm_adm, double *E, 
     static derivs u, v, cf_v;
     CCTK_REAL admMass;
 
-    if (!F)
-    {
+    if (!F) {
         CCTK_REAL up, um;
         /* Solve only when called for the first time */
         F = dvector(0, ntotal - 1);
@@ -400,8 +398,7 @@ void TPStore(double *mp, double *mm, double *mp_adm, double *mm_adm, double *E, 
 
 /* initialise to 0 */
 #pragma omp parallel for num_threads(TP_OMP_THREADS)
-        for (int j = 0; j < ntotal; j++)
-        {
+        for (int j = 0; j < ntotal; j++) {
             cf_v.d0[j] = 0.0;
             cf_v.d1[j] = 0.0;
             cf_v.d2[j] = 0.0;
@@ -427,8 +424,7 @@ void TPStore(double *mp, double *mm, double *mp_adm, double *mm_adm, double *E, 
         /* If bare masses are not given, iteratively solve for them given the
        target ADM masses target_M_plus and target_M_minus and with initial
        guesses given by par_m_plus and par_m_minus. */
-        if (!(TPID::give_bare_mass))
-        {
+        if (!(TPID::give_bare_mass)) {
             CCTK_REAL tmp, mp_adm_err, mm_adm_err;
             char valbuf[100];
 
@@ -436,21 +432,22 @@ void TPStore(double *mp, double *mm, double *mp_adm, double *mm_adm, double *E, 
             CCTK_REAL M_m = TPID::target_M_minus;
 
             printf("Attempting to find bare masses.\n");
-            printf("Target ADM masses: M_p=%g and M_m=%g\n",
-                   (double)M_p, (double)M_m);
+            printf("Target ADM masses: M_p=%g and M_m=%g\n", (double)M_p,
+                   (double)M_m);
             printf("ADM mass tolerance: %g\n", (double)TPID::adm_tol);
 
             /* Loop until both ADM masses are within adm_tol of their target */
-            do
-            {
-                printf("Bare masses: mp=%.15g, mm=%.15g\n",
-                       (double)*mp, (double)*mm);
+            do {
+                printf("Bare masses: mp=%.15g, mm=%.15g\n", (double)*mp,
+                       (double)*mm);
                 Newton(nvar, n1, n2, n3, v, TPID::Newton_tol, 1);
 
                 F_of_v(nvar, n1, n2, n3, v, F, u);
 
-                up = PunctIntPolAtArbitPosition(0, nvar, n1, n2, n3, v, TPID::par_b, 0., 0.);
-                um = PunctIntPolAtArbitPosition(0, nvar, n1, n2, n3, v, -TPID::par_b, 0., 0.);
+                up = PunctIntPolAtArbitPosition(0, nvar, n1, n2, n3, v,
+                                                TPID::par_b, 0., 0.);
+                um = PunctIntPolAtArbitPosition(0, nvar, n1, n2, n3, v,
+                                                -TPID::par_b, 0., 0.);
 
                 /* Calculate the ADM masses from the current bare mass guess */
                 *mp_adm = (1 + up) * *mp + *mp * *mm / (4. * TPID::par_b);
@@ -462,11 +459,13 @@ void TPStore(double *mp, double *mm, double *mp_adm, double *mm_adm, double *E, 
                 printf("ADM mass error: M_p_err=%.15g, M_m_err=%.15g\n",
                        mp_adm_err, mm_adm_err);
 
-                /* Invert the ADM mass equation and update the bare mass guess so that
-           it gives the correct target ADM masses */
-                tmp = -4 * TPID::par_b * (1 + um + up + um * up) +
-                      sqrt(16 * TPID::par_b * M_m * (1 + um) * (1 + up) +
-                           pow(-M_m + M_p + 4 * TPID::par_b * (1 + um) * (1 + up), 2));
+                /* Invert the ADM mass equation and update the bare mass guess
+           so that it gives the correct target ADM masses */
+                tmp =
+                    -4 * TPID::par_b * (1 + um + up + um * up) +
+                    sqrt(16 * TPID::par_b * M_m * (1 + um) * (1 + up) +
+                         pow(-M_m + M_p + 4 * TPID::par_b * (1 + um) * (1 + up),
+                             2));
                 *mp = (tmp + M_p - M_m) / (2. * (1 + up));
                 *mm = (tmp - M_p + M_m) / (2. * (1 + um));
 
@@ -495,8 +494,10 @@ void TPStore(double *mp, double *mm, double *mp_adm, double *mm_adm, double *E, 
 
         printf("The two puncture masses are mp=%.17g and mm=%.17g\n", *mp, *mm);
 
-        up = PunctIntPolAtArbitPosition(0, nvar, n1, n2, n3, v, TPID::par_b, 0., 0.);
-        um = PunctIntPolAtArbitPosition(0, nvar, n1, n2, n3, v, -TPID::par_b, 0., 0.);
+        up = PunctIntPolAtArbitPosition(0, nvar, n1, n2, n3, v, TPID::par_b, 0.,
+                                        0.);
+        um = PunctIntPolAtArbitPosition(0, nvar, n1, n2, n3, v, -TPID::par_b,
+                                        0., 0.);
 
         /* Calculate the ADM masses from the current bare mass guess */
         *mp_adm = (1 + up) * *mp + *mp * *mm / (4. * TPID::par_b);
@@ -505,8 +506,12 @@ void TPStore(double *mp, double *mm, double *mp_adm, double *mm_adm, double *E, 
         printf("Puncture 1 ADM mass is %g\n", *mp_adm);
         printf("Puncture 2 ADM mass is %g\n", *mm_adm);
 
-        /* print out ADM mass, eq.: \Delta M_ADM=2*r*u=4*b*V for A=1,B=0,phi=0 */
-        admMass = (*mp + *mm - 4 * TPID::par_b * PunctEvalAtArbitPosition(v.d0, 0, 1, 0, 0, nvar, n1, n2, n3));
+        /* print out ADM mass, eq.: \Delta M_ADM=2*r*u=4*b*V for A=1,B=0,phi=0
+         */
+        admMass =
+            (*mp + *mm -
+             4 * TPID::par_b *
+                 PunctEvalAtArbitPosition(v.d0, 0, 1, 0, 0, nvar, n1, n2, n3));
         printf("The total ADM mass is %g\n", admMass);
         *E = admMass;
 
@@ -518,8 +523,9 @@ void TPStore(double *mp, double *mm, double *mp_adm, double *mm_adm, double *E, 
       co = Table["center_offset[" <> ToString[i] <> "]", {i, 0, 2}];
       r1 = co + {"par_b", 0, 0};
       r2 = co + {-"par_b", 0, 0};
-      {p1, p2} = Table["par_P_" <> bh <> "[" <> ToString[i] <> "]", {bh, {"plus", "minus"}}, {i, 0, 2}];
-      {s1, s2} = Table["par_S_" <> bh <> "[" <> ToString[i] <> "]", {bh, {"plus", "minus"}}, {i, 0, 2}];
+      {p1, p2} = Table["par_P_" <> bh <> "[" <> ToString[i] <> "]", {bh,
+      {"plus", "minus"}}, {i, 0, 2}]; {s1, s2} = Table["par_S_" <> bh <> "[" <>
+      ToString[i] <> "]", {bh, {"plus", "minus"}}, {i, 0, 2}];
 
       J = Cross[r1, p1] + Cross[r2, p2] + s1 + s2;
 
@@ -529,17 +535,32 @@ void TPStore(double *mp, double *mm, double *mp_adm, double *mm_adm, double *E, 
         "\"" -> ""]];
      */
 
-        *J1 = -(TPID::center_offset[2] * TPID::par_P_minus[1]) + TPID::center_offset[1] * TPID::par_P_minus[2] - TPID::center_offset[2] * TPID::par_P_plus[1] + TPID::center_offset[1] * TPID::par_P_plus[2] + TPID::par_S_minus[0] + TPID::par_S_plus[0];
-        *J2 = TPID::center_offset[2] * TPID::par_P_minus[0] - TPID::center_offset[0] * TPID::par_P_minus[2] + TPID::par_b * TPID::par_P_minus[2] + TPID::center_offset[2] * TPID::par_P_plus[0] - TPID::center_offset[0] * TPID::par_P_plus[2] - TPID::par_b * TPID::par_P_plus[2] + TPID::par_S_minus[1] + TPID::par_S_plus[1];
-        *J3 = -(TPID::center_offset[1] * TPID::par_P_minus[0]) + TPID::center_offset[0] * TPID::par_P_minus[1] - TPID::par_b * TPID::par_P_minus[1] - TPID::center_offset[1] * TPID::par_P_plus[0] + TPID::center_offset[0] * TPID::par_P_plus[1] + TPID::par_b * TPID::par_P_plus[1] + TPID::par_S_minus[2] + TPID::par_S_plus[2];
+        *J1 = -(TPID::center_offset[2] * TPID::par_P_minus[1]) +
+              TPID::center_offset[1] * TPID::par_P_minus[2] -
+              TPID::center_offset[2] * TPID::par_P_plus[1] +
+              TPID::center_offset[1] * TPID::par_P_plus[2] +
+              TPID::par_S_minus[0] + TPID::par_S_plus[0];
+        *J2 = TPID::center_offset[2] * TPID::par_P_minus[0] -
+              TPID::center_offset[0] * TPID::par_P_minus[2] +
+              TPID::par_b * TPID::par_P_minus[2] +
+              TPID::center_offset[2] * TPID::par_P_plus[0] -
+              TPID::center_offset[0] * TPID::par_P_plus[2] -
+              TPID::par_b * TPID::par_P_plus[2] + TPID::par_S_minus[1] +
+              TPID::par_S_plus[1];
+        *J3 = -(TPID::center_offset[1] * TPID::par_P_minus[0]) +
+              TPID::center_offset[0] * TPID::par_P_minus[1] -
+              TPID::par_b * TPID::par_P_minus[1] -
+              TPID::center_offset[1] * TPID::par_P_plus[0] +
+              TPID::center_offset[0] * TPID::par_P_plus[1] +
+              TPID::par_b * TPID::par_P_plus[1] + TPID::par_S_minus[2] +
+              TPID::par_S_plus[2];
     }
 
     char fName[300];
     sprintf(fName, "%s_tpid_sol.bin", fprefix);
     FILE *write_ptr;
-    write_ptr = fopen(fName, "wb"); // w for write, b for binary
-    if (write_ptr == NULL)
-    {
+    write_ptr = fopen(fName, "wb");  // w for write, b for binary
+    if (write_ptr == NULL) {
         printf("tpid solver data write failed\n");
         return;
     }
@@ -595,9 +616,8 @@ void TPStore(double *mp, double *mm, double *mp_adm, double *mm_adm, double *E, 
     return;
 }
 
-void TPRestore(CCTK_REAL *&F, derivs &u, derivs &v, derivs &cf_v, const char *fprefix, bool mpi_bcast)
-{
-
+void TPRestore(CCTK_REAL *&F, derivs &u, derivs &v, derivs &cf_v,
+               const char *fprefix, bool mpi_bcast) {
     int rank, npes;
     MPI_Comm_rank(TP_MPI_COMM, &rank);
     MPI_Comm_size(TP_MPI_COMM, &npes);
@@ -609,16 +629,14 @@ void TPRestore(CCTK_REAL *&F, derivs &u, derivs &v, derivs &cf_v, const char *fp
     FILE *read_ptr;
     size_t fr_st = 0;
 
-    read_ptr = fopen(fName, "rb"); // w for write, b for binary
-    if (read_ptr == NULL)
-    {
+    read_ptr = fopen(fName, "rb");  // w for write, b for binary
+    if (read_ptr == NULL) {
         printf("tpid solver data read failed\n");
         return;
     }
 
     MPI_Barrier(TP_MPI_COMM);
-    if (!rank)
-        std::cout << "TPID data read begin: " << std::endl;
+    if (!rank) std::cout << "TPID data read begin: " << std::endl;
 
     fr_st = fread(&ntotal, sizeof(int), 1, read_ptr);
 
@@ -662,8 +680,7 @@ void TPRestore(CCTK_REAL *&F, derivs &u, derivs &v, derivs &cf_v, const char *fp
     fr_st = fread(cf_v.d33, sizeof(double), ntotal, read_ptr);
 
     MPI_Barrier(TP_MPI_COMM);
-    if (!rank)
-        std::cout << "TPID solver successfully restored: " << std::endl;
+    if (!rank) std::cout << "TPID solver successfully restored: " << std::endl;
 
     return;
 }

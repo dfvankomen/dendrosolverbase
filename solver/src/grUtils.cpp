@@ -32,12 +32,14 @@ void initDataFuncToPhysCoords(const double xx1, const double yy1,
     minkowskiInit(xx, yy, zz, var);
 }
 
+// clang-format off
 /*[[[cog
 import cog
 import sys
 import os
 import importlib.util
 import dendrosym
+cog.outl("// clang-format off")
 
 # get the current working directory, should be root of project
 current_path = os.getcwd()
@@ -52,6 +54,7 @@ spec.loader.exec_module(dendroconf)
 cog.outl("// INITIAL DATA FUNCTIONS")
 cog.outl(dendroconf.dendroConfigs.generate_initial_data_code(var_type="evolution"))
 ]]]*/
+// clang-format off
 
 //[[[end]]]
 

@@ -38,6 +38,8 @@ namespace dsolve {
  */
 // void dumpParamFile(std::ostream &sout, int root, MPI_Comm comm);
 
+// INITIAL DATA FUNCTIONS
+// clang-format off
 /*[[[cog
 import cog
 import sys
@@ -58,6 +60,7 @@ spec.loader.exec_module(dendroconf)
 cog.outl("// INITIAL DATA FUNCTIONS")
 cog.outl(dendroconf.dendroConfigs.generate_initial_data_declaration(var_type="evolution"))
 ]]]*/
+// clang-format on
 
 //[[[end]]]
 

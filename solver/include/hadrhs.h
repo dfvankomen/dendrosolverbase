@@ -3,4 +3,4 @@
 
 extern "C" void had_solver_rhs_();
 
-#endif // DENDROSOLVER_HADRHS_H_
+#endif  // DENDROSOLVER_HADRHS_H_

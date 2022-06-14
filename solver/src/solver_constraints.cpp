@@ -1,4 +1,5 @@
 #include "solver_constraints.h"
+
 #include <limits>
 
 using namespace dsolve;
@@ -7,18 +8,20 @@ using namespace dsolve;
  *
  * enforce physical constraints on variables:
  *
- * 
+ *
  *----------------------------------------------------------------------*/
-void enforce_solver_constraints(double **uiVar, const unsigned int node)
-{
+void enforce_solver_constraints(double **uiVar, const unsigned int node) {
     const double one_third = 1.0 / 3.0;
 
+    // clang-format off
     /*[[[cog
-    
+
     import cog
     import sys
     import importlib.util
     import dendrosym
+
+    cog.outl('// clang-format on')
 
     # the following lines will import any module directly from
     spec = importlib.util.spec_from_file_location("dendroconf", CONFIG_FILE_PATH)
@@ -26,10 +29,11 @@ void enforce_solver_constraints(double **uiVar, const unsigned int node)
     sys.modules[spec.name] = dendroconf
     spec.loader.exec_module(dendroconf)
 
-    cog.outl('//// SOLVER CONSTRAINTS')
+    cog.outl('//// EMDA CONSTRAINTS')
     cog.outl(dendroconf.dendroConfigs.generate_evolution_constraints())
-    
+
     ]]]*/
+    // clang-format on
 
     //[[[end]]]
 }

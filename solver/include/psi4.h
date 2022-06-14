@@ -2,9 +2,10 @@
 #define DENDROSOLVER_PSI4_H_
 
 #include <iostream>
-#include "parameters.h"
-#include "grUtils.h"
+
 #include "derivs.h"
+#include "grUtils.h"
+#include "parameters.h"
 
 #define deriv_x deriv42_x
 #define deriv_y deriv42_y
@@ -15,8 +16,7 @@
 #define deriv_zz deriv42_zz
 
 void psi4(double **uZipConVars, const double **uZipVars,
-          const unsigned int &offset,
-          const double *pmin, const double *pmax,
+          const unsigned int &offset, const double *pmin, const double *pmax,
           const unsigned int *sz, const unsigned int &bflag);
 
-#endif // DENDROSOLVER_PSI4_H_
+#endif  // DENDROSOLVER_PSI4_H_

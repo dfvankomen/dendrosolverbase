@@ -19,11 +19,13 @@
 #include "bh.h"
 #include "grDef.h"
 
+// clang-format off
 /*[[[cog
 
 import cog
 import dendrosym
 import os
+cog.outl("// clang-format off")
 
 paramh_str, paramc_str = dendrosym.params.generate_all_parameter_text("dsolve",
 PARAM_SETUP_FILE)
@@ -37,6 +39,7 @@ place to put this with open(os.path.join(os.path.dirname(PARAM_SETUP_FILE),
 PARAM_SETUP_FILE))
 
 ]]]*/
+// clang-format on
 namespace dsolve {
 void readParamFile(const char* inFile, MPI_Comm comm);
 void dumpParamFile(std::ostream& sout, int root, MPI_Comm comm);
