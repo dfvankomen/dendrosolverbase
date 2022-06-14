@@ -174,7 +174,8 @@ add_executable(grSolver ${SOURCE_FILES})
 # source directory is root of this project since this file is only called from
 # the outer CMake call
 target_include_directories(grSolver PRIVATE ${CMAKE_SOURCE_DIR})
-target_include_directories(grSolver PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(grSolver PRIVATE ${CMAKE_SOURCE_DIR}/solver)
+target_include_directories(grSolver PRIVATE ${CMAKE_SOURCE_DIR}/solver/include)
 target_include_directories(grSolver PRIVATE ${CMAKE_SOURCE_DIR}/scripts)
 target_include_directories(grSolver PRIVATE ${CMAKE_SOURCE_DIR}/dendro)
 target_include_directories(grSolver

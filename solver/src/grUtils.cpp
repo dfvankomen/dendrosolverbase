@@ -1441,6 +1441,40 @@ void computeBHLocations(const ot::Mesh *pMesh, const Point *in, Point *out,
     return;
 }
 
+void allocate_deriv_workspace(const ot::Mesh *pMesh, unsigned int s_fac) {
+
+    // start with deallocation of the workspace, needed when remeshing
+    deallocate_deriv_workspace();
+
+    if(!pMesh->isActive())
+        return;
+
+    // then get the largest block size from the mesh
+    const std::vector<ot::Block> & blkList = pMesh->getLocalBlockList();
+    unsigned int max_blk_sz=0;
+    for (unsigned int i = 0; i < blkList.size(); i++)
+    {
+        unsigned int blk_sz = blkList[i].getAllocationSzX() * blkList[i].getAllocationSzY() * blkList[i].getAllocationSzZ();
+        if (blk_sz > max_blk_sz)
+            max_blk_sz = blk_sz;
+    }
+
+    // make sure the derivatives are deallocated? seems unnecessary since it's done earlier?
+    deallocate_deriv_workspace();
+
+    // allocate the new memory
+    emda::EMDA_DERIV_WORKSPACE = new double[s_fac * max_blk_sz * emda::EMDA_NUM_DERIVATIVES];
+
+}
+
+void deallocate_deriv_workspace() {
+    // if the pointer isn't already null, delete the allocated memory 
+    if (emda::EMDA_DERIV_WORKSPACE != nullptr) {
+        delete[] emda::EMDA_DERIV_WORKSPACE;
+        emda::EMDA_DERIV_WORKSPACE = nullptr;
+    }
+}
+
 }  // end of namespace dsolve
 
 namespace dsolve {
