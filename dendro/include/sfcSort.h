@@ -406,8 +406,8 @@ namespace SFC
 
             if (n == 0)
                 return;
-            register unsigned int cnum;
-            register unsigned int cnum_prev = 0;
+            unsigned int cnum; // originallly given "register" in front
+            unsigned int cnum_prev = 0; // originallly given "register" in front
             //register unsigned int n=0;
             unsigned int rotation = 0;
             DendroIntL count[(NUM_CHILDREN + 2)] = {};
@@ -468,7 +468,7 @@ namespace SFC
 
                     pNodes[loc[(cnum)]++] = unsorted[live];
                     (loc[cnum] == n) ? unsorted[live] = pNodes[loc[cnum] - 1] : unsorted[live] = pNodes[loc[cnum]];
-                    if ((loc[cnum] == count[cnum + 1]))
+                    if (loc[cnum] == count[cnum + 1])
                     {
                         /* if(i<(n-1)) assert(live>0);
                         if(live==0) assert(i==(n-1));*/
@@ -669,8 +669,8 @@ namespace SFC
                 return;
             }
 
-            register unsigned int cnum;
-            register unsigned int cnum_prev = 0;
+            unsigned int cnum; // originallly given "register" in front
+            unsigned int cnum_prev = 0; // originallly given "register" in front
             DendroIntL num_elements = 0;
             unsigned int rotation = 0;
             DendroIntL count[(NUM_CHILDREN + 2)] = {};
@@ -756,7 +756,7 @@ namespace SFC
                 {
 
                     pNodes[loc[cnum]++] = unsorted[live];
-                    if ((loc[cnum] == count[cnum + 1]))
+                    if (loc[cnum] == count[cnum + 1])
                     {
                         live--;
                         continue;
@@ -2145,7 +2145,7 @@ namespace SFC
                     unsigned int count = 0;
                     //@milindasf : Possible location for MPI hang, if for a one processor if above is not true, then followign sendrecv will get hanged.
 
-                    while (count < pOutSorted.size() & state_global)
+                    while ((count < pOutSorted.size()) & state_global)
                     {
 
                         begin = pOutSorted[count];

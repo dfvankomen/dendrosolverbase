@@ -16,6 +16,35 @@ cmake_minimum_required(VERSION 2.8)
 # full project name and the languages used
 project(DendroSOLVER C CXX Fortran)
 
+# if (APPLE)
+#   set(OPENMP_INCLUDES "/usr/local/opt/libomp/include" "/usr/local/opt/llvm/include")
+#   set(OPENMP_LIBRARIES "/usr/local/opt/libomp/lib" "/usr/local/opt/llvm/lib")
+  
+#   if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+#         set(OpenMP_C "${CMAKE_C_COMPILER}")
+#         set(OpenMP_C_FLAGS "-fopenmp -Wno-unused-command-line-argument")
+#         set(OpenMP_C_LIB_NAMES "libomp" "libgomp" "libiomp5")
+#         set(OpenMP_libomp_LIBRARY ${OpenMP_C_LIB_NAMES})
+#         set(OpenMP_libgomp_LIBRARY ${OpenMP_C_LIB_NAMES})
+#         set(OpenMP_libiomp5_LIBRARY ${OpenMP_C_LIB_NAMES})
+#     endif()
+#     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+#       set(OpenMP_CXX "${CMAKE_CXX_COMPILER}")
+#       set(OpenMP_CXX_FLAGS "-fopenmp -Wno-unused-command-line-argument")
+#       set(OpenMP_CXX_LIB_NAMES "libomp" "libgomp" "libiomp5")
+#       set(OpenMP_libomp_LIBRARY ${OpenMP_CXX_LIB_NAMES})
+#       set(OpenMP_libgomp_LIBRARY ${OpenMP_CXX_LIB_NAMES})
+#       set(OpenMP_libiomp5_LIBRARY ${OpenMP_CXX_LIB_NAMES})
+#     endif()
+#     set(CMAKE_THREAD_LIBS_INIT "-lpthread")
+#     set(CMAKE_HAVE_THREADS_LIBRARY 1)
+#     set(CMAKE_USE_WIN32_THREADS_INIT 0)
+#     set(CMAKE_USE_PTHREADS_INIT 1)
+#     set(THREADS_PREFER_PTHREAD_FLAG ON)
+# endif()
+
+# message("${CMAKE_MODULE_PATH}")
+
 # the standard we're using is c++11
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
@@ -121,6 +150,7 @@ if(WITH_BLAS_LAPACK)
     if("$ENV{BLAS}" STREQUAL "")
       message(
         "Environment Variable BLAS is not set. Please set it to BLAS directory")
+      
     endif()
 
     if("$ENV{LAPACK}" STREQUAL "")

@@ -17,7 +17,7 @@
 
 // TODO: maybe this should be moved to dendro internal?
 // I ask because this originally had the BSSN_GR folder in its path
-#include "../../include/lebedev.h"
+#include "../../solver/include/lebedev.h"
 
 #include "meshUtils.h"
 #include "subSM.h"

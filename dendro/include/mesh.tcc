@@ -7097,8 +7097,8 @@ namespace ot
         unsigned int faceNeighCnum1[4] = {0, 0, 0, 0}; // immidiate neighbors
         unsigned int faceNeighCnum2[4] = {0, 0, 0, 0}; // neighbor's neighbors
 
-        register unsigned int nodeLookUp_CG;
-        register unsigned int nodeLookUp_DG;
+        unsigned int nodeLookUp_CG; // originallly given "register" in front
+        unsigned int nodeLookUp_DG; // originallly given "register" in front
 
         std::vector<T> interpOrInjectionOut; // interpolation or injection output.
         std::vector<T> injectionInput;       // input for the injection (values from all the 8 children) (This should be put in the order of the morton ordering. )

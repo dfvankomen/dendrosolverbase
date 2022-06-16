@@ -35,7 +35,7 @@ namespace dsolve {
 /**@brief smoothing modes avail for LTS recomended for LTS time stepping. */
 enum LTS_SMOOTH_MODE { KO = 0, WEIGHT_FUNC };
 
-class EMDACtx : public ts::Ctx<EMDACtx, DendroScalar, DendroIntL> {
+class SOLVERCtx : public ts::Ctx<SOLVERCtx, DendroScalar, DendroIntL> {
    protected:
     /**@brief: evolution var (zip)*/
     DVec m_uiEVar;
@@ -63,10 +63,10 @@ class EMDACtx : public ts::Ctx<EMDACtx, DendroScalar, DendroIntL> {
 
    public:
     /**@brief: default constructor*/
-    EMDACtx(ot::Mesh *pMesh);
+    SOLVERCtx(ot::Mesh *pMesh);
 
     /**@brief: default deconstructor*/
-    ~EMDACtx();
+    ~SOLVERCtx();
 
     /**
      * @brief sets time adaptive offset
