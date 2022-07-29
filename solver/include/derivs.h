@@ -202,7 +202,7 @@ void deriv8666adv_z(double *const Dzu, const double *const u, const double dz,
                     const unsigned int *sz, const double *const betaz,
                     unsigned bflag);
 
-// these are the derivs that will be used in the EMDA CODE based on the FD
+// these are the derivs that will be used based on the FD
 // derivative order.
 #ifdef DENDROSOLVER_USE_4TH_ORDER_DERIVS
 #define deriv_x deriv42_x

@@ -1,7 +1,7 @@
 /**
  * @author Milinda Fernando / David Van Komen
  * School of Computing, University of Utah
- * @brief Contins utility functions for EMDA simulation
+ * @brief Contins utility functions for General Relativity simulation
  */
 
 #ifndef DENDROSOLVER_GRUTILS_H_
@@ -10,7 +10,6 @@
 #include "block.h"
 #include "dendroProfileParams.h"
 #include "grDef.h"
-#include "json.hpp"
 #include "lebedev.h"
 #include "mesh.h"
 #include "parUtils.h"
@@ -19,8 +18,10 @@
 #include "profile_params.h"
 #include "swsh.h"
 
-using json = nlohmann::json;
 namespace dsolve {
+
+double inline rand_uniform_mid_range(const double mid, const double range);
+
 /**
  * @brief: Read the parameter file and initialize the variables in parameters.h
  * file.
@@ -37,6 +38,8 @@ namespace dsolve {
  * @param comm
  */
 // void dumpParamFile(std::ostream &sout, int root, MPI_Comm comm);
+
+void minkowskiInit(double x, double y, double z, double *u);
 
 // INITIAL DATA FUNCTIONS
 // clang-format off
@@ -104,8 +107,8 @@ void KerrSchildData(const double xx1, const double yy1, const double zz1,
  * @param zz1 : z coord
  * @param var : initialized dsolve variables for the grid points
  */
-// void noiseData(const double xx1, const double yy1, const double zz1, double
-// *var);
+void noiseData(const double xx1, const double yy1, const double zz1,
+               double *var);
 
 /**
  * @brief fake initial data.
@@ -125,15 +128,6 @@ void fake_initial_data(double x, double y, double z, double *u);
  * @param var : initialized dsolve variables for the grid points
  */
 void initDataFuncToPhysCoords(double xx1, double yy1, double zz1, double *var);
-
-/**
- * @brief calculate and set the initial data for noise
- * @param xx1 : x coord
- * @param yy1 : y coord
- * @param zz1 : z coord
- * @param var : initialized dsolve variables for the grid points
- */
-void noiseInit(double x, double y, double z, double *u);
 
 namespace trumpet_data {
 

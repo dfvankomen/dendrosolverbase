@@ -3,7 +3,7 @@
 //
 
 /**
- * @brief contains RK time stepper for EMDA equations.
+ * @brief contains RK time stepper for GR Equations.
  * @author Milinda Fernando
  * School of Computing, University of Utah
  *
@@ -251,69 +251,16 @@ void RK_SOLVER::applyInitialConditions(DendroScalar **zipIn) {
                             dsolve::punctureData((double)x, (double)y,
                                                  (double)z, var);
                         } else if (dsolve::DENDROSOLVER_ID_TYPE == 2) {
-                            // NOTE: THIS INITIALLY WAS KerrSchildData, but
-                            // we're doing different ones now everything below
-                            // this line is now custom functions
-
-                            // DO SUPERPOSED BOOSTED KERR SEN INIT
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
-                            dsolve::superposedBoostedKerrSenInit(
-                                (double)x, (double)y, (double)z, var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 3) {
-                            // NOTE: this one was just noise data
-
-                            // DO BOOSTED KERR SEN INIT
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
-                            dsolve::boostedKerrSenInit((double)x, (double)y,
-                                                       (double)z, var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 4) {
-                            // NOTE: this one was "fake_initial_data"
-
-                            // DO KERRSEN INIT
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
-                            dsolve::kerrsenInit((double)x, (double)y, (double)z,
-                                                var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 5) {
-                            // DO SCHwARZSCHILD INIT
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
-                            dsolve::schwarzschildInit((double)x, (double)y,
-                                                      (double)z, var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 6) {
-                            // DO FRANKENSTEIN INIT
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
-                            dsolve::frankensteinInit((double)x, (double)y,
-                                                     (double)z, var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 7) {
-                            // DO DYONIC KERR NEWMAN INIT
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
-                            dsolve::dyonicKerrNewmanInit((double)x, (double)y,
-                                                         (double)z, var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 8) {
-                            // DO MINKOWSKI INIT
+                            // DO NOISE INIT
                             x = GRIDX_TO_X(x);
                             y = GRIDY_TO_Y(y);
                             z = GRIDZ_TO_Z(z);
                             dsolve::minkowskiInit((double)x, (double)y,
                                                   (double)z, var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 9) {
-                            // DO NOISE INIT
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
-                            dsolve::noiseInit((double)x, (double)y, (double)z,
-                                              var);
+                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 3) {
+                            dsolve::noiseData((double)GRIDX_TO_X(x),
+                                              (double)GRIDY_TO_Y(y),
+                                              (double)GRIDZ_TO_Z(z), var);
                         } else {
                             std::cout << "Unknown ID type: "
                                       << dsolve::DENDROSOLVER_ID_TYPE
@@ -336,6 +283,7 @@ void RK_SOLVER::applyInitialConditions(DendroScalar **zipIn) {
 void RK_SOLVER::initialGridConverge() {
     applyInitialConditions(m_uiPrevVar);
 
+    // isRefine refers to if we should try to refine further
     bool isRefine = false;
     DendroIntL oldElements, oldElements_g;
     DendroIntL newElements, newElements_g;
@@ -397,6 +345,10 @@ void RK_SOLVER::initialGridConverge() {
             } else if (dsolve::DENDROSOLVER_REFINEMENT_MODE ==
                        dsolve::RefinementMode::BH_LOC) {
                 isRefine = dsolve::isRemeshBH(m_uiMesh, m_uiBHLoc);
+            } else if (dsolve::DENDROSOLVER_REFINEMENT_MODE ==
+                       dsolve::RefinementMode::REFINE_MODE_NONE) {
+                // don't refine at all is a new option
+                isRefine = false;
             } else {
                 std::cout << " Error : " << __func__
                           << " invalid refinement mode specified " << std::endl;
@@ -490,18 +442,28 @@ void RK_SOLVER::initialGridConverge() {
 #endif
 
             if (m_uiMesh->isActive()) {
-                DendroScalar l_min = vecMin(m_uiPrevVar[dsolve::VAR::U_ALPHA] +
-                                                m_uiMesh->getNodeLocalBegin(),
-                                            (m_uiMesh->getNumLocalMeshNodes()),
-                                            m_uiMesh->getMPICommunicator());
-                DendroScalar l_max = vecMax(m_uiPrevVar[dsolve::VAR::U_ALPHA] +
-                                                m_uiMesh->getNodeLocalBegin(),
-                                            (m_uiMesh->getNumLocalMeshNodes()),
-                                            m_uiMesh->getMPICommunicator());
                 if (!(m_uiMesh->getMPIRank())) {
-                    std::cout << "transfer completed:    ||VAR::U_ALPHA|| "
-                                 "(min, max) : ("
-                              << l_min << ", " << l_max << " ) " << std::endl;
+                    std::cout << "TRANSFER COMPLETED, VARIABLE SUMMARY FOR "
+                              << m_uiMesh->getNumLocalMeshNodes()
+                              << " NODES:" << std::endl;
+                }
+
+                for (const auto tmp_varID :
+                     dsolve::DENDROSOLVER_VAR_ITERABLE_LIST) {
+                    DendroScalar l_min = vecMin(
+                        m_uiPrevVar[tmp_varID] + m_uiMesh->getNodeLocalBegin(),
+                        (m_uiMesh->getNumLocalMeshNodes()),
+                        m_uiMesh->getMPICommunicator());
+                    DendroScalar l_max = vecMax(
+                        m_uiPrevVar[tmp_varID] + m_uiMesh->getNodeLocalBegin(),
+                        (m_uiMesh->getNumLocalMeshNodes()),
+                        m_uiMesh->getMPICommunicator());
+                    if (!(m_uiMesh->getMPIRank())) {
+                        std::cout << "    ||VAR::"
+                                  << dsolve::DENDROSOLVER_VAR_NAMES[tmp_varID]
+                                  << "|| (min, max) : (" << l_min << ", "
+                                  << l_max << " ) " << std::endl;
+                    }
                 }
             }
 
@@ -726,63 +688,56 @@ void RK_SOLVER::zipVars(DendroScalar **uzipIn, DendroScalar **zipOut) {
 
 void RK_SOLVER::applyBoundaryConditions() {}
 
-// TODO: do the split into solver types like done in EMDA code
-void RK_SOLVER::performSingleIteration() {
+void RK_SOLVER::performSingleIterationRK3() {
+    // BEGIN COMMON DEFINITIONS AND OPERATIONS NECESSARY FOR EACH RK TYPE
     char frawName[256];
 
-    if (m_uiMesh->isActive()) {
-        double current_t = m_uiCurrentTime;
-        double current_t_adv = current_t;
-#if 0
-            sprintf(frawName,"rkU_%d",3*m_uiCurrentStep);
-            io::varToRawData((const ot::Mesh*)m_uiMesh,(const double **)m_uiPrevVar,dsolve::DENDROSOLVER_NUM_VARS,NULL,frawName);
-#endif
+    double current_t = m_uiCurrentTime;
+    double current_t_adv = current_t;
 
 #ifdef RK_SOLVER_OVERLAP_COMM_AND_COMP
-        unzipVars_async(m_uiPrevVar, m_uiUnzipVar);
+    // async unzip to assign the "prevVar" values to the unzip variable
+    unzipVars_async(m_uiPrevVar, m_uiUnzipVar);
 #else
-        // 1. perform ghost exchange.
-        performGhostExchangeVars(m_uiPrevVar);
-        // 2. unzip all the variables.
-        unzipVars(m_uiPrevVar, m_uiUnzipVar);
+    // ghost exchange and then unzip if there is no overlap enabled
+    performGhostExchangeVars(m_uiPrevVar);
+    unzipVars(m_uiPrevVar, m_uiUnzipVar);
 #endif
 
-        int rank = m_uiMesh->getMPIRank();
+    int rank = m_uiMesh->getMPIRank();
 
-        const unsigned int nodeLocalBegin = m_uiMesh->getNodeLocalBegin();
-        const unsigned int nodeLocalEnd = m_uiMesh->getNodeLocalEnd();
+    const unsigned int nodeLocalBegin = m_uiMesh->getNodeLocalBegin();
+    const unsigned int nodeLocalEnd = m_uiMesh->getNodeLocalEnd();
 
-        const std::vector<ot::Block> &blkList = m_uiMesh->getLocalBlockList();
-        unsigned int offset;
-        double ptmin[3], ptmax[3];
-        unsigned int sz[3];
-        unsigned int bflag;
-        double dx, dy, dz;
-        const Point pt_min(dsolve::DENDROSOLVER_COMPD_MIN[0],
-                           dsolve::DENDROSOLVER_COMPD_MIN[1],
-                           dsolve::DENDROSOLVER_COMPD_MIN[2]);
-        const Point pt_max(dsolve::DENDROSOLVER_COMPD_MAX[0],
-                           dsolve::DENDROSOLVER_COMPD_MAX[1],
-                           dsolve::DENDROSOLVER_COMPD_MAX[2]);
-        const unsigned int PW = dsolve::DENDROSOLVER_PADDING_WIDTH;
+    const std::vector<ot::Block> &blkList = m_uiMesh->getLocalBlockList();
+    unsigned int offset;
+    double ptmin[3], ptmax[3];
+    unsigned int sz[3];
+    unsigned int bflag;
+    double dx, dy, dz;
+    const Point pt_min(dsolve::DENDROSOLVER_COMPD_MIN[0],
+                       dsolve::DENDROSOLVER_COMPD_MIN[1],
+                       dsolve::DENDROSOLVER_COMPD_MIN[2]);
+    const Point pt_max(dsolve::DENDROSOLVER_COMPD_MAX[0],
+                       dsolve::DENDROSOLVER_COMPD_MAX[0],
+                       dsolve::DENDROSOLVER_COMPD_MAX[0]);
+    const unsigned int PW = dsolve::DENDROSOLVER_PADDING_WIDTH;
 
-        if (m_uiRKType == RKType::RK3) {
-            // initial unzip and ghost exchange happens at the rkSolve class.
-            dendroSolverRHS(m_uiUnzipVarRHS,
-                            (const DendroScalar **)m_uiUnzipVar,
-                            &(*(blkList.begin())), blkList.size());
-            zipVars(m_uiUnzipVarRHS, m_uiStage[0]);
+    // END COMMON DEFINITIONS AND OPERATIONS
 
-            for (unsigned int node = nodeLocalBegin; node < nodeLocalEnd;
-                 node++) {
-                for (unsigned int index = 0;
-                     index < dsolve::DENDROSOLVER_NUM_VARS; index++) {
-                    m_uiStage[0][index][node] =
-                        m_uiPrevVar[index][node] +
-                        m_uiT_h * m_uiStage[0][index][node];
-                }
-                enforce_solver_constraints(m_uiStage[0], node);
-            }
+    // initial unzip and ghost exchange happens at the rkSolve class.
+    dendroSolverRHS(m_uiUnzipVarRHS, (const DendroScalar **)m_uiUnzipVar,
+                    &(*(blkList.begin())), blkList.size());
+    zipVars(m_uiUnzipVarRHS, m_uiStage[0]);
+
+    for (unsigned int node = nodeLocalBegin; node < nodeLocalEnd; node++) {
+        for (unsigned int index = 0; index < dsolve::DENDROSOLVER_NUM_VARS;
+             index++) {
+            m_uiStage[0][index][node] =
+                m_uiPrevVar[index][node] + m_uiT_h * m_uiStage[0][index][node];
+        }
+        enforce_solver_constraints(m_uiStage[0], node);
+    }
 
 #if 0            
             sprintf(frawName,"rkU_%d",3*m_uiCurrentStep + 1);
@@ -790,28 +745,26 @@ void RK_SOLVER::performSingleIteration() {
 #endif
 
 #ifdef RK_SOLVER_OVERLAP_COMM_AND_COMP
-            unzipVars_async(m_uiStage[0], m_uiUnzipVar);
+    unzipVars_async(m_uiStage[0], m_uiUnzipVar);
 #else
-            performGhostExchangeVars(m_uiStage[0]);
-            unzipVars(m_uiStage[0], m_uiUnzipVar);
+    performGhostExchangeVars(m_uiStage[0]);
+    unzipVars(m_uiStage[0], m_uiUnzipVar);
 #endif
 
-            dendroSolverRHS(m_uiUnzipVarRHS,
-                            (const DendroScalar **)m_uiUnzipVar,
-                            &(*(blkList.begin())), blkList.size());
-            zipVars(m_uiUnzipVarRHS, m_uiStage[1]);
+    dendroSolverRHS(m_uiUnzipVarRHS, (const DendroScalar **)m_uiUnzipVar,
+                    &(*(blkList.begin())), blkList.size());
+    zipVars(m_uiUnzipVarRHS, m_uiStage[1]);
 
-            for (unsigned int node = nodeLocalBegin; node < nodeLocalEnd;
-                 node++) {
-                for (unsigned int index = 0;
-                     index < dsolve::DENDROSOLVER_NUM_VARS; index++) {
-                    m_uiStage[1][index][node] =
-                        (0.75) * m_uiPrevVar[index][node] +
-                        0.25 * m_uiStage[0][index][node] +
-                        m_uiT_h * 0.25 * m_uiStage[1][index][node];
-                }
-                enforce_solver_constraints(m_uiStage[1], node);
-            }
+    for (unsigned int node = nodeLocalBegin; node < nodeLocalEnd; node++) {
+        for (unsigned int index = 0; index < dsolve::DENDROSOLVER_NUM_VARS;
+             index++) {
+            m_uiStage[1][index][node] =
+                (0.75) * m_uiPrevVar[index][node] +
+                0.25 * m_uiStage[0][index][node] +
+                m_uiT_h * 0.25 * m_uiStage[1][index][node];
+        }
+        enforce_solver_constraints(m_uiStage[1], node);
+    }
 
 #if 0
             sprintf(frawName,"rkU_%d",3*m_uiCurrentStep + 2);
@@ -819,127 +772,270 @@ void RK_SOLVER::performSingleIteration() {
 #endif
 
 #ifdef RK_SOLVER_OVERLAP_COMM_AND_COMP
-            unzipVars_async(m_uiStage[1], m_uiUnzipVar);
+    unzipVars_async(m_uiStage[1], m_uiUnzipVar);
 #else
-            performGhostExchangeVars(m_uiStage[1]);
-            unzipVars(m_uiStage[1], m_uiUnzipVar);
+    performGhostExchangeVars(m_uiStage[1]);
+    unzipVars(m_uiStage[1], m_uiUnzipVar);
 #endif
 
-            dendroSolverRHS(m_uiUnzipVarRHS,
-                            (const DendroScalar **)m_uiUnzipVar,
-                            &(*(blkList.begin())), blkList.size());
-            zipVars(m_uiUnzipVarRHS, m_uiVar);
+    dendroSolverRHS(m_uiUnzipVarRHS, (const DendroScalar **)m_uiUnzipVar,
+                    &(*(blkList.begin())), blkList.size());
+    zipVars(m_uiUnzipVarRHS, m_uiVar);
 
-            for (unsigned int node = nodeLocalBegin; node < nodeLocalEnd;
-                 node++) {
-                for (unsigned int index = 0;
-                     index < dsolve::DENDROSOLVER_NUM_VARS; index++) {
-                    m_uiVar[index][node] =
-                        (1.0 / 3.0) * m_uiPrevVar[index][node] +
-                        (2.0 / 3.0) * m_uiStage[1][index][node] +
-                        m_uiT_h * (2.0 / 3.0) * m_uiVar[index][node];
-                }
-                enforce_solver_constraints(m_uiVar, node);
+    for (unsigned int node = nodeLocalBegin; node < nodeLocalEnd; node++) {
+        for (unsigned int index = 0; index < dsolve::DENDROSOLVER_NUM_VARS;
+             index++) {
+            m_uiVar[index][node] = (1.0 / 3.0) * m_uiPrevVar[index][node] +
+                                   (2.0 / 3.0) * m_uiStage[1][index][node] +
+                                   m_uiT_h * (2.0 / 3.0) * m_uiVar[index][node];
+        }
+        enforce_solver_constraints(m_uiVar, node);
+    }
+}
+
+void RK_SOLVER::performSingleIterationRK4() {
+    // BEGIN COMMON DEFINITIONS AND OPERATIONS NECESSARY FOR EACH RK TYPE
+    char frawName[256];
+
+    double current_t = m_uiCurrentTime;
+    double current_t_adv = current_t;
+
+#ifdef RK_SOLVER_OVERLAP_COMM_AND_COMP
+    // async unzip to assign the "prevVar" values to the unzip variable
+    unzipVars_async(m_uiPrevVar, m_uiUnzipVar);
+#else
+    // ghost exchange and then unzip if there is no overlap enabled
+    performGhostExchangeVars(m_uiPrevVar);
+    unzipVars(m_uiPrevVar, m_uiUnzipVar);
+#endif
+
+    int rank = m_uiMesh->getMPIRank();
+
+    const unsigned int nodeLocalBegin = m_uiMesh->getNodeLocalBegin();
+    const unsigned int nodeLocalEnd = m_uiMesh->getNodeLocalEnd();
+
+    const std::vector<ot::Block> &blkList = m_uiMesh->getLocalBlockList();
+    unsigned int offset;
+    double ptmin[3], ptmax[3];
+    unsigned int sz[3];
+    unsigned int bflag;
+    double dx, dy, dz;
+    const Point pt_min(dsolve::DENDROSOLVER_COMPD_MIN[0],
+                       dsolve::DENDROSOLVER_COMPD_MIN[1],
+                       dsolve::DENDROSOLVER_COMPD_MIN[2]);
+    const Point pt_max(dsolve::DENDROSOLVER_COMPD_MAX[0],
+                       dsolve::DENDROSOLVER_COMPD_MAX[1],
+                       dsolve::DENDROSOLVER_COMPD_MAX[2]);
+    const unsigned int PW = dsolve::DENDROSOLVER_PADDING_WIDTH;
+
+    // END COMMON DEFINITIONS AND OPERATIONS
+
+    // BEGIN RK4 STEPPING
+
+    // iterate through the variable RK4 stages to compute the next steps
+    for (unsigned int stage = 0; stage < (dsolve::DENDROSOLVER_RK4_STAGES - 1);
+         stage++) {
+#ifdef DEBUG_RK_SOLVER
+        if (!rank) std::cout << " stage: " << stage << " begin: " << std::endl;
+        for (unsigned int index = 0; index < dsolve::DENDROSOLVER_NUM_VARS;
+             index++)
+            ot::test::isUnzipNaN(m_uiMesh, m_uiUnzipVar[index]);
+#endif
+
+        dendroSolverRHS(m_uiUnzipVarRHS, (const DendroScalar **)m_uiUnzipVar,
+                        &(*(blkList.begin())), blkList.size());
+
+#ifdef DEBUG_RK_SOLVER
+        if (!rank)
+            std::cout << " stage: " << stage
+                      << " af rhs UNZIP RHS TEST:" << std::endl;
+        for (unsigned int index = 0; index < dsolve::DENDROSOLVER_NUM_VARS;
+             index++)
+            ot::test::isUnzipInternalNaN(m_uiMesh, m_uiUnzipVarRHS[index]);
+#endif
+
+        // zip the calculated RHS variables into the "stage" variable
+        zipVars(m_uiUnzipVarRHS, m_uiStage[stage]);
+
+#ifdef DEBUG_RK_SOLVER
+        for (unsigned int index = 0; index < dsolve::DENDROSOLVER_NUM_VARS;
+             index++)
+            if (seq::test::isNAN(
+                    m_uiStage[stage][index] + m_uiMesh->getNodeLocalBegin(),
+                    m_uiMesh->getNumLocalMeshNodes()))
+                std::cout << " var: " << index
+                          << " contains nan af zip  stage: " << stage
+                          << std::endl;
+#endif
+
+        /*for(unsigned int index=0;index<dsolve::DENDROSOLVER_NUM_VARS;index++)
+            for(unsigned int node=nodeLocalBegin;node<nodeLocalEnd;node++)
+                m_uiStage[stage][index][node]*=m_uiT_h;*/
+
+        // throughout the nodes we need to assign the "previous" variable
+        // values to the intermediate step and enforce constraints
+        for (unsigned int node = nodeLocalBegin; node < nodeLocalEnd; node++) {
+            for (unsigned int index = 0; index < dsolve::DENDROSOLVER_NUM_VARS;
+                 index++) {
+                m_uiVarIm[index][node] = m_uiPrevVar[index][node];
+
+                m_uiVarIm[index][node] += (RK4_U[stage + 1] * m_uiT_h *
+                                           m_uiStage[stage][index][node]);
             }
+            enforce_solver_constraints(m_uiVarIm, node);
+        }
 
-            /*
-     *
-     *  !!!! this does not work for some reason .
-    // stage 0   f(u_k)
-    dendroSolverRHS(m_uiUnzipVarRHS,(const DendroScalar
-    **)m_uiUnzipVar,&(*(blkList.begin())),blkList.size());
-    zipVars(m_uiUnzipVarRHS,m_uiStage[0]);
-    #if 0
-    sprintf(frawName,"rk3_step_%d_stage_%d",m_uiCurrentStep,0);
-    io::varToRawData((const ot::Mesh*)m_uiMesh,(const double
-    **)m_uiStage[0],dsolve::DENDROSOLVER_NUM_VARS,NULL,frawName); #endif
-    // u1
-    for(unsigned int node=nodeLocalBegin; node<nodeLocalEnd; node++)
-    {
+        // #ifdef DENDROSOLVER_SAVE_RHS_EVERY_SINGLE_STEP
+        //         // TEMP: save the output of the current variables!!!
+        //         std::cout << "Now saving RHS portion" << std::endl;
+        //         writeEvolutionAndRHStoVTU(m_uiPrevVar, m_uiStage[stage],
+        //                                   dsolve::DENDROSOLVER_NUM_EVOL_VARS_VTU_OUTPUT,
+        //                                   dsolve::DENDROSOLVER_VTU_OUTPUT_EVOL_INDICES,
+        //                                   stage);
+        // #endif
 
-       for(unsigned int index=0; index<dsolve::DENDROSOLVER_NUM_VARS; index++)
-       {
-           m_uiVarIm[index][node]=m_uiPrevVar[index][node] + m_uiT_h *
-    m_uiStage[0][index][node];
-       }
-       enforce_solver_constraints(m_uiVarIm, node);
-    }
-
-    #if 0
-    sprintf(frawName,"rkU_%d",3*m_uiCurrentStep+(1));
-    io::varToRawData((const ot::Mesh*)m_uiMesh,(const double
-    **)m_uiVarIm,dsolve::DENDROSOLVER_NUM_VARS,NULL,frawName); #endif
-    current_t_adv=current_t+m_uiT_h;
-
-    #ifdef RK_SOLVER_OVERLAP_COMM_AND_COMP
-        unzipVars_async(m_uiVarIm,m_uiUnzipVar);
-    #else
+        // then we update the time
+        current_t_adv = current_t + RK4_T[stage + 1] * m_uiT_h;
+#ifdef RK_SOLVER_OVERLAP_COMM_AND_COMP
+        unzipVars_async(m_uiVarIm, m_uiUnzipVar);
+#else
         performGhostExchangeVars(m_uiVarIm);
-        unzipVars(m_uiVarIm,m_uiUnzipVar);
-    #endif
+        unzipVars(m_uiVarIm, m_uiUnzipVar);
+#endif
+    }  // END RK4 STAGE BLOCKS
 
+    // update the time again
+    current_t_adv =
+        current_t + RK4_T[(dsolve::DENDROSOLVER_RK4_STAGES - 1)] * m_uiT_h;
 
-    // stage 1
-    dendroSolverRHS(m_uiUnzipVarRHS,(const DendroScalar
-    **)m_uiUnzipVar,&(*(blkList.begin())),blkList.size());
-    zipVars(m_uiUnzipVarRHS,m_uiStage[1]);
-    #if 0
-    sprintf(frawName,"rk3_step_%d_stage_%d",m_uiCurrentStep,1);
-    io::varToRawData((const ot::Mesh*)m_uiMesh,(const double
-    **)m_uiStage[1],dsolve::DENDROSOLVER_NUM_VARS,NULL,frawName); #endif
+#ifdef DEBUG_RK_SOLVER
+    if (!rank)
+        std::cout << " stage: " << (dsolve::DENDROSOLVER_RK4_STAGES - 1)
+                  << " begin: " << std::endl;
 
-    // u2
-    for(unsigned int node=nodeLocalBegin; node<nodeLocalEnd; node++)
-    {
+    for (unsigned int index = 0; index < dsolve::DENDROSOLVER_NUM_VARS; index++)
+        ot::test::isUnzipNaN(m_uiMesh, m_uiUnzipVar[index]);
+#endif
 
-       for(unsigned int index=0; index<dsolve::DENDROSOLVER_NUM_VARS; index++)
-       {
-           m_uiVarIm[index][node]=m_uiPrevVar[index][node] + m_uiT_h * 0.25 *
-    (m_uiStage[0][index][node] + m_uiStage[1][index][node]);
-       }
-       enforce_solver_constraints(m_uiVarIm, node);
+    dendroSolverRHS(m_uiUnzipVarRHS, (const DendroScalar **)m_uiUnzipVar,
+                    &(*(blkList.begin())), blkList.size());
+
+#ifdef DEBUG_RK_SOLVER
+    if (!rank)
+        std::cout << " stage: " << (dsolve::DENDROSOLVER_RK4_STAGES - 1)
+                  << " af rhs UNZIP RHS TEST:" << std::endl;
+    for (unsigned int index = 0; index < dsolve::DENDROSOLVER_NUM_VARS; index++)
+        ot::test::isUnzipInternalNaN(m_uiMesh, m_uiUnzipVarRHS[index]);
+#endif
+    // put the unziped RHS values into the "stage" storage for the final RK4
+    // stage
+    zipVars(m_uiUnzipVarRHS, m_uiStage[(dsolve::DENDROSOLVER_RK4_STAGES - 1)]);
+
+    // std::cout << "Running final step for RK4 solver with " << nodeLocalEnd <<
+    // " nodes:" << std::endl;
+
+    // update the variables with the calculated update based on RHS
+    for (unsigned int node = nodeLocalBegin; node < nodeLocalEnd; node++) {
+        for (unsigned int index = 0; index < dsolve::DENDROSOLVER_NUM_VARS;
+             index++) {
+            m_uiVar[index][node] = m_uiPrevVar[index][node];
+            for (unsigned int s = 0; s < (dsolve::DENDROSOLVER_RK4_STAGES);
+                 s++) {
+                m_uiVar[index][node] +=
+                    (RK4_C[s] * m_uiT_h * m_uiStage[s][index][node]);
+            }
+        }
+        // enforce constraints again just to make sure we didn't mess up
+        enforce_solver_constraints(m_uiVar, node);
     }
 
-    #if 0
-    sprintf(frawName,"rkU_%d",3*m_uiCurrentStep+(2));
-    io::varToRawData((const ot::Mesh*)m_uiMesh,(const double
-    **)m_uiVarIm,dsolve::DENDROSOLVER_NUM_VARS,NULL,frawName); #endif
-    current_t_adv=current_t+m_uiT_h;
+    // std::cout << "Finished RK4 Step!" << std::endl;
+}
 
-    #ifdef RK_SOLVER_OVERLAP_COMM_AND_COMP
-        unzipVars_async(m_uiVarIm,m_uiUnzipVar);
-    #else
-        performGhostExchangeVars(m_uiVarIm);
-        unzipVars(m_uiVarIm,m_uiUnzipVar);
-    #endif
+void RK_SOLVER::performSingleIterationRK45() {
+    // BEGIN COMMON DEFINITIONS AND OPERATIONS NECESSARY FOR EACH RK TYPE
+    char frawName[256];
 
-    // stage 2.
-    dendroSolverRHS(m_uiUnzipVarRHS,(const DendroScalar
-    **)m_uiUnzipVar,&(*(blkList.begin())),blkList.size());
-    zipVars(m_uiUnzipVarRHS,m_uiStage[2]);
+    double current_t = m_uiCurrentTime;
+    double current_t_adv = current_t;
 
-    #if 0
-    sprintf(frawName,"rk3_step_%d_stage_%d",m_uiCurrentStep,2);
-    io::varToRawData((const ot::Mesh*)m_uiMesh,(const double
-    **)m_uiStage[1],dsolve::DENDROSOLVER_NUM_VARS,NULL,frawName); #endif
+#ifdef RK_SOLVER_OVERLAP_COMM_AND_COMP
+    // async unzip to assign the "prevVar" values to the unzip variable
+    unzipVars_async(m_uiPrevVar, m_uiUnzipVar);
+#else
+    // ghost exchange and then unzip if there is no overlap enabled
+    performGhostExchangeVars(m_uiPrevVar);
+    unzipVars(m_uiPrevVar, m_uiUnzipVar);
+#endif
 
-    // u_(k+1)
-    for(unsigned int node=nodeLocalBegin; node<nodeLocalEnd; node++)
-    {
+    int rank = m_uiMesh->getMPIRank();
 
-       for(unsigned int index=0; index<dsolve::DENDROSOLVER_NUM_VARS; index++)
-       {
-           m_uiVar[index][node]=m_uiPrevVar[index][node] + m_uiT_h *(
-    (1.0/6.0)*m_uiStage[0][index][node] + (1.0/6.0)*m_uiStage[1][index][node] +
-    (2.0/3.0)*m_uiStage[2][index][node]);
-       }
-       enforce_solver_constraints(m_uiVar, node);
-    }
- */
-        } else if (m_uiRKType == RKType::RK4) {  // rk4 solver
-            // std::cout<<"rk4"<<std::endl;
+    const unsigned int nodeLocalBegin = m_uiMesh->getNodeLocalBegin();
+    const unsigned int nodeLocalEnd = m_uiMesh->getNodeLocalEnd();
+
+    const std::vector<ot::Block> &blkList = m_uiMesh->getLocalBlockList();
+    unsigned int offset;
+    double ptmin[3], ptmax[3];
+    unsigned int sz[3];
+    unsigned int bflag;
+    double dx, dy, dz;
+    const Point pt_min(dsolve::DENDROSOLVER_COMPD_MIN[0],
+                       dsolve::DENDROSOLVER_COMPD_MIN[1],
+                       dsolve::DENDROSOLVER_COMPD_MIN[2]);
+    const Point pt_max(dsolve::DENDROSOLVER_COMPD_MAX[0],
+                       dsolve::DENDROSOLVER_COMPD_MAX[1],
+                       dsolve::DENDROSOLVER_COMPD_MAX[2]);
+    const unsigned int PW = dsolve::DENDROSOLVER_PADDING_WIDTH;
+
+    // END COMMON DEFINITIONS AND OPERATIONS
+
+    // BEGIN RK45 STEPPING
+    // std::cout<<"rk45"<<std::endl;
+
+    bool repeatStep;
+    double n_inf_max = 0.0;
+    double n_inf_max_g = 0;
+
+    do {
+        repeatStep = false;
+        n_inf_max = 0;
+        n_inf_max_g = 0;
+
+        if (m_uiMesh->isActive()) {
+            double current_t = m_uiCurrentTime;
+            double current_t_adv = current_t;
+#ifdef RK_SOLVER_OVERLAP_COMM_AND_COMP
+            unzipVars_async(m_uiPrevVar, m_uiUnzipVar);
+#else
+            // 1. perform ghost exchange.
+            performGhostExchangeVars(m_uiPrevVar);
+
+            // 2. unzip all the variables.
+            unzipVars(m_uiPrevVar, m_uiUnzipVar);
+#endif
+
+            int rank = m_uiMesh->getMPIRank();
+
+            const unsigned int nodeLocalBegin = m_uiMesh->getNodeLocalBegin();
+            const unsigned int nodeLocalEnd = m_uiMesh->getNodeLocalEnd();
+
+            const std::vector<ot::Block> &blkList =
+                m_uiMesh->getLocalBlockList();
+
+            unsigned int offset;
+            double ptmin[3], ptmax[3];
+            unsigned int sz[3];
+            unsigned int bflag;
+            double dx, dy, dz;
+            const Point pt_min(dsolve::DENDROSOLVER_COMPD_MIN[0],
+                               dsolve::DENDROSOLVER_COMPD_MIN[1],
+                               dsolve::DENDROSOLVER_COMPD_MIN[2]);
+            const Point pt_max(dsolve::DENDROSOLVER_COMPD_MAX[0],
+                               dsolve::DENDROSOLVER_COMPD_MAX[1],
+                               dsolve::DENDROSOLVER_COMPD_MAX[2]);
+
             for (unsigned int stage = 0;
-                 stage < (dsolve::DENDROSOLVER_RK4_STAGES - 1); stage++) {
+                 stage < (dsolve::DENDROSOLVER_RK45_STAGES - 1); stage++) {
 #ifdef DEBUG_RK_SOLVER
                 if (!rank)
                     std::cout << " stage: " << stage << " begin: " << std::endl;
@@ -949,37 +1045,37 @@ void RK_SOLVER::performSingleIteration() {
 #endif
 
 #ifdef DENDROSOLVER_ENABLE_CUDA
-                cuda::EMDAComputeParams dsolveParams;
-                dsolveParams.DENDROSOLVER_LAMBDA[0] =
-                    dsolve::DENDROSOLVER_LAMBDA[0];
-                dsolveParams.DENDROSOLVER_LAMBDA[1] =
-                    dsolve::DENDROSOLVER_LAMBDA[1];
-                dsolveParams.DENDROSOLVER_LAMBDA[2] =
-                    dsolve::DENDROSOLVER_LAMBDA[2];
-                dsolveParams.DENDROSOLVER_LAMBDA[3] =
-                    dsolve::DENDROSOLVER_LAMBDA[3];
+                    // cuda::EMDAComputeParams emdaParams;
+                    // emdaParams.EMDA_LAMBDA[0] =
+                    // dsolve::DENDROSOLVER_LAMBDA[0]; emdaParams.EMDA_LAMBDA[1]
+                    // = dsolve::DENDROSOLVER_LAMBDA[1];
+                    // emdaParams.EMDA_LAMBDA[2] =
+                    // dsolve::DENDROSOLVER_LAMBDA[2]; emdaParams.EMDA_LAMBDA[3]
+                    // = dsolve::DENDROSOLVER_LAMBDA[3];
 
-                dsolveParams.DENDROSOLVER_LAMBDA_F[0] =
-                    dsolve::DENDROSOLVER_LAMBDA_F[0];
-                dsolveParams.DENDROSOLVER_LAMBDA_F[1] =
-                    dsolve::DENDROSOLVER_LAMBDA_F[1];
+                    // emdaParams.EMDA_LAMBDA_F[0] =
+                    // dsolve::DENDROSOLVER_LAMBDA_F[0];
+                    // emdaParams.EMDA_LAMBDA_F[1] =
+                    // dsolve::DENDROSOLVER_LAMBDA_F[1];
 
-                dsolveParams.DENDROSOLVER_ETA_POWER[0] =
-                    dsolve::DENDROSOLVER_ETA_POWER[0];
-                dsolveParams.DENDROSOLVER_ETA_POWER[1] =
-                    dsolve::DENDROSOLVER_ETA_POWER[1];
+                    // emdaParams.EMDA_ETA_POWER[0] =
+                    // dsolve::DENDROSOLVER_ETA_POWER[0];
+                    // emdaParams.EMDA_ETA_POWER[1] =
+                    // dsolve::DENDROSOLVER_ETA_POWER[1];
 
-                dsolveParams.ETA_R0 = dsolve::ETA_R0;
-                dsolveParams.ETA_CONST = dsolve::ETA_CONST;
-                dsolveParams.ETA_DAMPING = dsolve::ETA_DAMPING;
-                dsolveParams.ETA_DAMPING_EXP = dsolve::ETA_DAMPING_EXP;
-                dsolveParams.KO_DISS_SIGMA = dsolve::KO_DISS_SIGMA;
+                    // emdaParams.ETA_R0 = emda::ETA_R0;
+                    // emdaParams.ETA_CONST = emda::ETA_CONST;
+                    // emdaParams.ETA_DAMPING = emda::ETA_DAMPING;
+                    // emdaParams.ETA_DAMPING_EXP = emda::ETA_DAMPING_EXP;
+                    // emdaParams.KO_DISS_SIGMA = emda::KO_DISS_SIGMA;
 
-                dim3 threadBlock(16, 16, 1);
-                cuda::computeRHS(m_uiUnzipVarRHS, (const double **)m_uiUnzipVar,
-                                 &(*(blkList.begin())), blkList.size(),
-                                 (const cuda::EMDAComputeParams *)&dsolveParams,
-                                 threadBlock, pt_min, pt_max, 1);
+                    // dim3 threadBlock(16, 16, 1);
+                    // cuda::computeRHS(m_uiUnzipVarRHS, (const double
+                    // **)m_uiUnzipVar,
+                    //                  &(*(blkList.begin())), blkList.size(),
+                    //                  (const cuda::EMDAComputeParams
+                    //                  *)&emdaParams, threadBlock, pt_min,
+                    //                  pt_max, 1);
 #else
 
                 for (unsigned int blk = 0; blk < blkList.size(); blk++) {
@@ -1008,16 +1104,9 @@ void RK_SOLVER::performSingleIteration() {
                     ptmax[2] = GRIDZ_TO_Z(blkList[blk].getBlockNode().maxZ()) +
                                PW * dz;
 
-#ifdef DENDROSOLVER_RHS_STAGED_COMP
-
-                    dendroSolverRHSUnpacked_sep(
-                        m_uiUnzipVarRHS, (const double **)m_uiUnzipVar, offset,
-                        ptmin, ptmax, sz, bflag);
-#else
                     dendroSolverRHSUnpacked(m_uiUnzipVarRHS,
                                             (const double **)m_uiUnzipVar,
                                             offset, ptmin, ptmax, sz, bflag);
-#endif
                 }
 #endif
 
@@ -1044,27 +1133,26 @@ void RK_SOLVER::performSingleIteration() {
                                   << std::endl;
 #endif
 
-                /*for(unsigned int
-             index=0;index<dsolve::DENDROSOLVER_NUM_VARS;index++) for(unsigned
-             int node=nodeLocalBegin;node<nodeLocalEnd;node++)
-                     m_uiStage[stage][index][node]*=m_uiT_h;*/
-
                 for (unsigned int node = nodeLocalBegin; node < nodeLocalEnd;
                      node++) {
                     for (unsigned int index = 0;
                          index < dsolve::DENDROSOLVER_NUM_VARS; index++) {
                         m_uiVarIm[index][node] = m_uiPrevVar[index][node];
-                        // if(!rank && index==0 && node==0) std::cout<<"rk
-                        // stage: "<<stage<<" im coef: "<<stage<<" value:
-                        // "<<RK4_U[stage+1]<<std::endl;
-                        m_uiVarIm[index][node] +=
-                            (RK4_U[stage + 1] * m_uiT_h *
-                             m_uiStage[stage][index][node]);
+                        for (unsigned int s = 0; s < (stage + 1); s++) {
+                            // if(!rank && index==0 && node==0)
+                            // std::cout<<"rk stage: "<<stage<<" im
+                            // coef:
+                            // "<<s<<" value:
+                            // "<<RK_U[stage+1][s]<<std::endl;
+                            m_uiVarIm[index][node] +=
+                                (RK_U[stage + 1][s] * m_uiT_h *
+                                 m_uiStage[s][index][node]);
+                        }
                     }
                     enforce_solver_constraints(m_uiVarIm, node);
                 }
 
-                current_t_adv = current_t + RK4_T[stage + 1] * m_uiT_h;
+                current_t_adv = current_t + RK_T[stage + 1] * m_uiT_h;
 #ifdef RK_SOLVER_OVERLAP_COMM_AND_COMP
                 unzipVars_async(m_uiVarIm, m_uiUnzipVar);
 #else
@@ -1074,12 +1162,12 @@ void RK_SOLVER::performSingleIteration() {
             }
 
             current_t_adv =
-                current_t +
-                RK4_T[(dsolve::DENDROSOLVER_RK4_STAGES - 1)] * m_uiT_h;
+                current_t + RK_T[(dsolve::DENDROSOLVER_RK45_STAGES - 1)];
 
 #ifdef DEBUG_RK_SOLVER
             if (!rank)
-                std::cout << " stage: " << (dsolve::DENDROSOLVER_RK4_STAGES - 1)
+                std::cout << " stage: "
+                          << (dsolve::DENDROSOLVER_RK45_STAGES - 1)
                           << " begin: " << std::endl;
 
             for (unsigned int index = 0; index < dsolve::DENDROSOLVER_NUM_VARS;
@@ -1088,37 +1176,34 @@ void RK_SOLVER::performSingleIteration() {
 #endif
 
 #ifdef DENDROSOLVER_ENABLE_CUDA
-            cuda::EMDAComputeParams dsolveParams;
-            dsolveParams.DENDROSOLVER_LAMBDA[0] =
-                dsolve::DENDROSOLVER_LAMBDA[0];
-            dsolveParams.DENDROSOLVER_LAMBDA[1] =
-                dsolve::DENDROSOLVER_LAMBDA[1];
-            dsolveParams.DENDROSOLVER_LAMBDA[2] =
-                dsolve::DENDROSOLVER_LAMBDA[2];
-            dsolveParams.DENDROSOLVER_LAMBDA[3] =
-                dsolve::DENDROSOLVER_LAMBDA[3];
+                // cuda::EMDAComputeParams emdaParams;
+                // emdaParams.EMDA_LAMBDA[0] = dsolve::DENDROSOLVER_LAMBDA[0];
+                // emdaParams.EMDA_LAMBDA[1] = dsolve::DENDROSOLVER_LAMBDA[1];
+                // emdaParams.EMDA_LAMBDA[2] = dsolve::DENDROSOLVER_LAMBDA[2];
+                // emdaParams.EMDA_LAMBDA[3] = dsolve::DENDROSOLVER_LAMBDA[3];
 
-            dsolveParams.DENDROSOLVER_LAMBDA_F[0] =
-                dsolve::DENDROSOLVER_LAMBDA_F[0];
-            dsolveParams.DENDROSOLVER_LAMBDA_F[1] =
-                dsolve::DENDROSOLVER_LAMBDA_F[1];
+                // emdaParams.EMDA_LAMBDA_F[0] =
+                // dsolve::DENDROSOLVER_LAMBDA_F[0]; emdaParams.EMDA_LAMBDA_F[1]
+                // = dsolve::DENDROSOLVER_LAMBDA_F[1];
 
-            dsolveParams.DENDROSOLVER_ETA_POWER[0] =
-                dsolve::DENDROSOLVER_ETA_POWER[0];
-            dsolveParams.DENDROSOLVER_ETA_POWER[1] =
-                dsolve::DENDROSOLVER_ETA_POWER[1];
+                // emdaParams.EMDA_ETA_POWER[0] =
+                // dsolve::DENDROSOLVER_ETA_POWER[0];
+                // emdaParams.EMDA_ETA_POWER[1] =
+                // dsolve::DENDROSOLVER_ETA_POWER[1];
 
-            dsolveParams.ETA_R0 = dsolve::ETA_R0;
-            dsolveParams.ETA_CONST = dsolve::ETA_CONST;
-            dsolveParams.ETA_DAMPING = dsolve::ETA_DAMPING;
-            dsolveParams.ETA_DAMPING_EXP = dsolve::ETA_DAMPING_EXP;
-            dsolveParams.KO_DISS_SIGMA = dsolve::KO_DISS_SIGMA;
+                // emdaParams.ETA_R0 = emda::ETA_R0;
+                // emdaParams.ETA_CONST = emda::ETA_CONST;
+                // emdaParams.ETA_DAMPING = emda::ETA_DAMPING;
+                // emdaParams.ETA_DAMPING_EXP = emda::ETA_DAMPING_EXP;
+                // emdaParams.KO_DISS_SIGMA = emda::KO_DISS_SIGMA;
 
-            dim3 threadBlock(16, 16, 1);
-            cuda::computeRHS(m_uiUnzipVarRHS, (const double **)m_uiUnzipVar,
-                             &(*(blkList.begin())), blkList.size(),
-                             (const cuda::EMDAComputeParams *)&dsolveParams,
-                             threadBlock, pt_min, pt_max, 1);
+                // dim3 threadBlock(16, 16, 1);
+                // cuda::computeRHS(m_uiUnzipVarRHS, (const double
+                // **)m_uiUnzipVar,
+                //                  &(*(blkList.begin())), blkList.size(),
+                //                  (const cuda::EMDAComputeParams
+                //                  *)&emdaParams, threadBlock, pt_min, pt_max,
+                //                  1);
 #else
 
             for (unsigned int blk = 0; blk < blkList.size(); blk++) {
@@ -1147,433 +1232,110 @@ void RK_SOLVER::performSingleIteration() {
                 ptmax[2] =
                     GRIDZ_TO_Z(blkList[blk].getBlockNode().maxZ()) + PW * dz;
 
-#ifdef DENDROSOLVER_RHS_STAGED_COMP
-
-                dendroSolverRHSUnpacked_sep(m_uiUnzipVarRHS,
-                                            (const double **)m_uiUnzipVar,
-                                            offset, ptmin, ptmax, sz, bflag);
-#else
                 dendroSolverRHSUnpacked(m_uiUnzipVarRHS,
                                         (const double **)m_uiUnzipVar, offset,
                                         ptmin, ptmax, sz, bflag);
-#endif
             }
 
 #endif
 
 #ifdef DEBUG_RK_SOLVER
             if (!rank)
-                std::cout << " stage: " << (dsolve::DENDROSOLVER_RK4_STAGES - 1)
+                std::cout << " stage: "
+                          << (dsolve::DENDROSOLVER_RK45_STAGES - 1)
                           << " af rhs UNZIP RHS TEST:" << std::endl;
+
             for (unsigned int index = 0; index < dsolve::DENDROSOLVER_NUM_VARS;
                  index++)
                 ot::test::isUnzipInternalNaN(m_uiMesh, m_uiUnzipVarRHS[index]);
 #endif
 
             zipVars(m_uiUnzipVarRHS,
-                    m_uiStage[(dsolve::DENDROSOLVER_RK4_STAGES - 1)]);
+                    m_uiStage[(dsolve::DENDROSOLVER_RK45_STAGES - 1)]);
+
+            /*for(unsigned int
+        index=0;index<dsolve::DENDROSOLVER_NUM_VARS;index++) for(unsigned int
+        node=nodeLocalBegin;node<nodeLocalEnd;node++)
+            m_uiStage[(dsolve::DENDROSOLVER_RK45_STAGES-1)][index][node]*=m_uiT_h;*/
 
             for (unsigned int node = nodeLocalBegin; node < nodeLocalEnd;
                  node++) {
                 for (unsigned int index = 0;
                      index < dsolve::DENDROSOLVER_NUM_VARS; index++) {
+                    m_uiVarIm[index][node] = m_uiPrevVar[index][node];
+                    for (unsigned int s = 0;
+                         s < (dsolve::DENDROSOLVER_RK45_STAGES - 1); s++) {
+                        if (s == 1) continue;
+                        m_uiVarIm[index][node] +=
+                            (RK_4_C[s] * m_uiT_h * m_uiStage[s][index][node]);
+                    }
+
                     m_uiVar[index][node] = m_uiPrevVar[index][node];
                     for (unsigned int s = 0;
-                         s < (dsolve::DENDROSOLVER_RK4_STAGES); s++) {
+                         s < dsolve::DENDROSOLVER_RK45_STAGES; s++) {
+                        if (s == 1) continue;  // because rk coef is zero.
                         m_uiVar[index][node] +=
-                            (RK4_C[s] * m_uiT_h * m_uiStage[s][index][node]);
+                            (RK_5_C[s] * m_uiT_h * m_uiStage[s][index][node]);
                     }
                 }
+
+                enforce_solver_constraints(m_uiVarIm, node);
                 enforce_solver_constraints(m_uiVar, node);
             }
-        } else if (m_uiRKType == RKType::RK45) {  // rk45 solver
 
-            // std::cout<<"rk45"<<std::endl;
+            // update the m_uiTh bases on the normed diff between
+            // m_uiVarIm, m_uiVar.
 
-            bool repeatStep;
-            double n_inf_max = 0.0;
-            double n_inf_max_g = 0;
+            double n_inf;
+            n_inf_max = 0;
+            for (unsigned int index = 0; index < dsolve::DENDROSOLVER_NUM_VARS;
+                 index++) {
+                n_inf = normLInfty(m_uiVarIm[index] + nodeLocalBegin,
+                                   m_uiVar[index] + nodeLocalBegin,
+                                   (nodeLocalEnd - nodeLocalBegin),
+                                   m_uiMesh->getMPICommunicator());
+                if (n_inf > n_inf_max) n_inf_max = n_inf;
+            }
+        }
 
-            do {
-                repeatStep = false;
-                n_inf_max = 0;
-                n_inf_max_g = 0;
+        // below all reduction is act as an barrier for inactive procs.
+        par::Mpi_Allreduce(&n_inf_max, &n_inf_max_g, 1, MPI_MAX, m_uiComm);
+        n_inf_max = n_inf_max_g;
 
-                if (m_uiMesh->isActive()) {
-                    double current_t = m_uiCurrentTime;
-                    double current_t_adv = current_t;
-#ifdef RK_SOLVER_OVERLAP_COMM_AND_COMP
-                    unzipVars_async(m_uiPrevVar, m_uiUnzipVar);
-#else
-                    // 1. perform ghost exchange.
-                    performGhostExchangeVars(m_uiPrevVar);
+        if (n_inf_max > dsolve::DENDROSOLVER_RK45_DESIRED_TOL) {
+            repeatStep = true;
+            m_uiT_h =
+                dsolve::DENDROSOLVER_SAFETY_FAC * m_uiT_h *
+                (pow(fabs(dsolve::DENDROSOLVER_RK45_DESIRED_TOL / n_inf_max),
+                     0.25));
+            if (!m_uiMesh->getMPIRankGlobal())
+                std::cout << " repeat : " << m_uiCurrentStep
+                          << " with : " << m_uiT_h << std::endl;
+        } else {
+            repeatStep = false;
+            m_uiT_h =
+                dsolve::DENDROSOLVER_SAFETY_FAC * m_uiT_h *
+                (pow(fabs(dsolve::DENDROSOLVER_RK45_DESIRED_TOL / n_inf_max),
+                     0.20));
+        }
 
-                    // 2. unzip all the variables.
-                    unzipVars(m_uiPrevVar, m_uiUnzipVar);
-#endif
+    } while (repeatStep);
+    // TODO: update 45 solver with most recent Dendro 5.0 code
+}
 
-                    int rank = m_uiMesh->getMPIRank();
-
-                    const unsigned int nodeLocalBegin =
-                        m_uiMesh->getNodeLocalBegin();
-                    const unsigned int nodeLocalEnd =
-                        m_uiMesh->getNodeLocalEnd();
-
-                    const std::vector<ot::Block> &blkList =
-                        m_uiMesh->getLocalBlockList();
-
-                    unsigned int offset;
-                    double ptmin[3], ptmax[3];
-                    unsigned int sz[3];
-                    unsigned int bflag;
-                    double dx, dy, dz;
-                    const Point pt_min(dsolve::DENDROSOLVER_COMPD_MIN[0],
-                                       dsolve::DENDROSOLVER_COMPD_MIN[1],
-                                       dsolve::DENDROSOLVER_COMPD_MIN[2]);
-                    const Point pt_max(dsolve::DENDROSOLVER_COMPD_MAX[0],
-                                       dsolve::DENDROSOLVER_COMPD_MAX[1],
-                                       dsolve::DENDROSOLVER_COMPD_MAX[2]);
-
-                    for (unsigned int stage = 0;
-                         stage < (dsolve::DENDROSOLVER_RK45_STAGES - 1);
-                         stage++) {
-#ifdef DEBUG_RK_SOLVER
-                        if (!rank)
-                            std::cout << " stage: " << stage
-                                      << " begin: " << std::endl;
-                        for (unsigned int index = 0;
-                             index < dsolve::DENDROSOLVER_NUM_VARS; index++)
-                            ot::test::isUnzipNaN(m_uiMesh, m_uiUnzipVar[index]);
-#endif
-
-#ifdef DENDROSOLVER_ENABLE_CUDA
-                        cuda::EMDAComputeParams dsolveParams;
-                        dsolveParams.DENDROSOLVER_LAMBDA[0] =
-                            dsolve::DENDROSOLVER_LAMBDA[0];
-                        dsolveParams.DENDROSOLVER_LAMBDA[1] =
-                            dsolve::DENDROSOLVER_LAMBDA[1];
-                        dsolveParams.DENDROSOLVER_LAMBDA[2] =
-                            dsolve::DENDROSOLVER_LAMBDA[2];
-                        dsolveParams.DENDROSOLVER_LAMBDA[3] =
-                            dsolve::DENDROSOLVER_LAMBDA[3];
-
-                        dsolveParams.DENDROSOLVER_LAMBDA_F[0] =
-                            dsolve::DENDROSOLVER_LAMBDA_F[0];
-                        dsolveParams.DENDROSOLVER_LAMBDA_F[1] =
-                            dsolve::DENDROSOLVER_LAMBDA_F[1];
-
-                        dsolveParams.DENDROSOLVER_ETA_POWER[0] =
-                            dsolve::DENDROSOLVER_ETA_POWER[0];
-                        dsolveParams.DENDROSOLVER_ETA_POWER[1] =
-                            dsolve::DENDROSOLVER_ETA_POWER[1];
-
-                        dsolveParams.ETA_R0 = dsolve::ETA_R0;
-                        dsolveParams.ETA_CONST = dsolve::ETA_CONST;
-                        dsolveParams.ETA_DAMPING = dsolve::ETA_DAMPING;
-                        dsolveParams.ETA_DAMPING_EXP = dsolve::ETA_DAMPING_EXP;
-                        dsolveParams.KO_DISS_SIGMA = dsolve::KO_DISS_SIGMA;
-
-                        dim3 threadBlock(16, 16, 1);
-                        cuda::computeRHS(
-                            m_uiUnzipVarRHS, (const double **)m_uiUnzipVar,
-                            &(*(blkList.begin())), blkList.size(),
-                            (const cuda::EMDAComputeParams *)&dsolveParams,
-                            threadBlock, pt_min, pt_max, 1);
-#else
-
-                        for (unsigned int blk = 0; blk < blkList.size();
-                             blk++) {
-                            offset = blkList[blk].getOffset();
-                            sz[0] = blkList[blk].getAllocationSzX();
-                            sz[1] = blkList[blk].getAllocationSzY();
-                            sz[2] = blkList[blk].getAllocationSzZ();
-
-                            bflag = blkList[blk].getBlkNodeFlag();
-
-                            dx = blkList[blk].computeDx(pt_min, pt_max);
-                            dy = blkList[blk].computeDy(pt_min, pt_max);
-                            dz = blkList[blk].computeDz(pt_min, pt_max);
-
-                            ptmin[0] =
-                                GRIDX_TO_X(blkList[blk].getBlockNode().minX()) -
-                                PW * dx;
-                            ptmin[1] =
-                                GRIDY_TO_Y(blkList[blk].getBlockNode().minY()) -
-                                PW * dy;
-                            ptmin[2] =
-                                GRIDZ_TO_Z(blkList[blk].getBlockNode().minZ()) -
-                                PW * dz;
-
-                            ptmax[0] =
-                                GRIDX_TO_X(blkList[blk].getBlockNode().maxX()) +
-                                PW * dx;
-                            ptmax[1] =
-                                GRIDY_TO_Y(blkList[blk].getBlockNode().maxY()) +
-                                PW * dy;
-                            ptmax[2] =
-                                GRIDZ_TO_Z(blkList[blk].getBlockNode().maxZ()) +
-                                PW * dz;
-
-#ifdef DENDROSOLVER_RHS_STAGED_COMP
-
-                            dendroSolverRHSUnpacked_sep(
-                                m_uiUnzipVarRHS, (const double **)m_uiUnzipVar,
-                                offset, ptmin, ptmax, sz, bflag);
-#else
-                            dendroSolverRHSUnpacked(
-                                m_uiUnzipVarRHS, (const double **)m_uiUnzipVar,
-                                offset, ptmin, ptmax, sz, bflag);
-#endif
-                        }
-#endif
-
-#ifdef DEBUG_RK_SOLVER
-                        if (!rank)
-                            std::cout << " stage: " << stage
-                                      << " af rhs UNZIP RHS TEST:" << std::endl;
-                        for (unsigned int index = 0;
-                             index < dsolve::DENDROSOLVER_NUM_VARS; index++)
-                            ot::test::isUnzipInternalNaN(
-                                m_uiMesh, m_uiUnzipVarRHS[index]);
-#endif
-
-                        zipVars(m_uiUnzipVarRHS, m_uiStage[stage]);
-
-#ifdef DEBUG_RK_SOLVER
-                        for (unsigned int index = 0;
-                             index < dsolve::DENDROSOLVER_NUM_VARS; index++)
-                            if (seq::test::isNAN(
-                                    m_uiStage[stage][index] +
-                                        m_uiMesh->getNodeLocalBegin(),
-                                    m_uiMesh->getNumLocalMeshNodes()))
-                                std::cout
-                                    << " var: " << index
-                                    << " contains nan af zip  stage: " << stage
-                                    << std::endl;
-#endif
-
-                        /*for(unsigned int
-                    index=0;index<dsolve::DENDROSOLVER_NUM_VARS;index++)
-                    for(unsigned int
-                    node=nodeLocalBegin;node<nodeLocalEnd;node++)
-                            m_uiStage[stage][index][node]*=m_uiT_h;*/
-
-                        for (unsigned int node = nodeLocalBegin;
-                             node < nodeLocalEnd; node++) {
-                            for (unsigned int index = 0;
-                                 index < dsolve::DENDROSOLVER_NUM_VARS;
-                                 index++) {
-                                m_uiVarIm[index][node] =
-                                    m_uiPrevVar[index][node];
-                                for (unsigned int s = 0; s < (stage + 1); s++) {
-                                    // if(!rank && index==0 && node==0)
-                                    // std::cout<<"rk stage: "<<stage<<" im
-                                    // coef:
-                                    // "<<s<<" value:
-                                    // "<<RK_U[stage+1][s]<<std::endl;
-                                    m_uiVarIm[index][node] +=
-                                        (RK_U[stage + 1][s] * m_uiT_h *
-                                         m_uiStage[s][index][node]);
-                                }
-                            }
-                            enforce_solver_constraints(m_uiVarIm, node);
-                        }
-
-                        current_t_adv = current_t + RK_T[stage + 1] * m_uiT_h;
-#ifdef RK_SOLVER_OVERLAP_COMM_AND_COMP
-                        unzipVars_async(m_uiVarIm, m_uiUnzipVar);
-#else
-                        performGhostExchangeVars(m_uiVarIm);
-                        unzipVars(m_uiVarIm, m_uiUnzipVar);
-#endif
-                    }
-
-                    current_t_adv =
-                        current_t +
-                        RK_T[(dsolve::DENDROSOLVER_RK45_STAGES - 1)];
-
-#ifdef DEBUG_RK_SOLVER
-                    if (!rank)
-                        std::cout << " stage: "
-                                  << (dsolve::DENDROSOLVER_RK45_STAGES - 1)
-                                  << " begin: " << std::endl;
-
-                    for (unsigned int index = 0;
-                         index < dsolve::DENDROSOLVER_NUM_VARS; index++)
-                        ot::test::isUnzipNaN(m_uiMesh, m_uiUnzipVar[index]);
-#endif
-
-#ifdef DENDROSOLVER_ENABLE_CUDA
-                    cuda::EMDAComputeParams dsolveParams;
-                    dsolveParams.DENDROSOLVER_LAMBDA[0] =
-                        dsolve::DENDROSOLVER_LAMBDA[0];
-                    dsolveParams.DENDROSOLVER_LAMBDA[1] =
-                        dsolve::DENDROSOLVER_LAMBDA[1];
-                    dsolveParams.DENDROSOLVER_LAMBDA[2] =
-                        dsolve::DENDROSOLVER_LAMBDA[2];
-                    dsolveParams.DENDROSOLVER_LAMBDA[3] =
-                        dsolve::DENDROSOLVER_LAMBDA[3];
-
-                    dsolveParams.DENDROSOLVER_LAMBDA_F[0] =
-                        dsolve::DENDROSOLVER_LAMBDA_F[0];
-                    dsolveParams.DENDROSOLVER_LAMBDA_F[1] =
-                        dsolve::DENDROSOLVER_LAMBDA_F[1];
-
-                    dsolveParams.DENDROSOLVER_ETA_POWER[0] =
-                        dsolve::DENDROSOLVER_ETA_POWER[0];
-                    dsolveParams.DENDROSOLVER_ETA_POWER[1] =
-                        dsolve::DENDROSOLVER_ETA_POWER[1];
-
-                    dsolveParams.ETA_R0 = dsolve::ETA_R0;
-                    dsolveParams.ETA_CONST = dsolve::ETA_CONST;
-                    dsolveParams.ETA_DAMPING = dsolve::ETA_DAMPING;
-                    dsolveParams.ETA_DAMPING_EXP = dsolve::ETA_DAMPING_EXP;
-                    dsolveParams.KO_DISS_SIGMA = dsolve::KO_DISS_SIGMA;
-
-                    dim3 threadBlock(16, 16, 1);
-                    cuda::computeRHS(
-                        m_uiUnzipVarRHS, (const double **)m_uiUnzipVar,
-                        &(*(blkList.begin())), blkList.size(),
-                        (const cuda::EMDAComputeParams *)&dsolveParams,
-                        threadBlock, pt_min, pt_max, 1);
-#else
-
-                    for (unsigned int blk = 0; blk < blkList.size(); blk++) {
-                        offset = blkList[blk].getOffset();
-                        sz[0] = blkList[blk].getAllocationSzX();
-                        sz[1] = blkList[blk].getAllocationSzY();
-                        sz[2] = blkList[blk].getAllocationSzZ();
-
-                        bflag = blkList[blk].getBlkNodeFlag();
-
-                        dx = blkList[blk].computeDx(pt_min, pt_max);
-                        dy = blkList[blk].computeDy(pt_min, pt_max);
-                        dz = blkList[blk].computeDz(pt_min, pt_max);
-
-                        ptmin[0] =
-                            GRIDX_TO_X(blkList[blk].getBlockNode().minX()) -
-                            PW * dx;
-                        ptmin[1] =
-                            GRIDY_TO_Y(blkList[blk].getBlockNode().minY()) -
-                            PW * dy;
-                        ptmin[2] =
-                            GRIDZ_TO_Z(blkList[blk].getBlockNode().minZ()) -
-                            PW * dz;
-
-                        ptmax[0] =
-                            GRIDX_TO_X(blkList[blk].getBlockNode().maxX()) +
-                            PW * dx;
-                        ptmax[1] =
-                            GRIDY_TO_Y(blkList[blk].getBlockNode().maxY()) +
-                            PW * dy;
-                        ptmax[2] =
-                            GRIDZ_TO_Z(blkList[blk].getBlockNode().maxZ()) +
-                            PW * dz;
-
-#ifdef DENDROSOLVER_RHS_STAGED_COMP
-
-                        dendroSolverRHSUnpacked_sep(
-                            m_uiUnzipVarRHS, (const double **)m_uiUnzipVar,
-                            offset, ptmin, ptmax, sz, bflag);
-#else
-                        dendroSolverRHSUnpacked(
-                            m_uiUnzipVarRHS, (const double **)m_uiUnzipVar,
-                            offset, ptmin, ptmax, sz, bflag);
-#endif
-                    }
-
-#endif
-
-#ifdef DEBUG_RK_SOLVER
-                    if (!rank)
-                        std::cout << " stage: "
-                                  << (dsolve::DENDROSOLVER_RK45_STAGES - 1)
-                                  << " af rhs UNZIP RHS TEST:" << std::endl;
-
-                    for (unsigned int index = 0;
-                         index < dsolve::DENDROSOLVER_NUM_VARS; index++)
-                        ot::test::isUnzipInternalNaN(m_uiMesh,
-                                                     m_uiUnzipVarRHS[index]);
-#endif
-
-                    zipVars(m_uiUnzipVarRHS,
-                            m_uiStage[(dsolve::DENDROSOLVER_RK45_STAGES - 1)]);
-
-                    /*for(unsigned int
-                index=0;index<dsolve::DENDROSOLVER_NUM_VARS;index++)
-                for(unsigned int node=nodeLocalBegin;node<nodeLocalEnd;node++)
-                    m_uiStage[(dsolve::DENDROSOLVER_RK45_STAGES-1)][index][node]*=m_uiT_h;*/
-
-                    for (unsigned int node = nodeLocalBegin;
-                         node < nodeLocalEnd; node++) {
-                        for (unsigned int index = 0;
-                             index < dsolve::DENDROSOLVER_NUM_VARS; index++) {
-                            m_uiVarIm[index][node] = m_uiPrevVar[index][node];
-                            for (unsigned int s = 0;
-                                 s < (dsolve::DENDROSOLVER_RK45_STAGES - 1);
-                                 s++) {
-                                if (s == 1) continue;
-                                m_uiVarIm[index][node] +=
-                                    (RK_4_C[s] * m_uiT_h *
-                                     m_uiStage[s][index][node]);
-                            }
-
-                            m_uiVar[index][node] = m_uiPrevVar[index][node];
-                            for (unsigned int s = 0;
-                                 s < dsolve::DENDROSOLVER_RK45_STAGES; s++) {
-                                if (s == 1)
-                                    continue;  // because rk coef is zero.
-                                m_uiVar[index][node] +=
-                                    (RK_5_C[s] * m_uiT_h *
-                                     m_uiStage[s][index][node]);
-                            }
-                        }
-
-                        enforce_solver_constraints(m_uiVarIm, node);
-                        enforce_solver_constraints(m_uiVar, node);
-                    }
-
-                    // update the m_uiTh bases on the normed diff between
-                    // m_uiVarIm, m_uiVar.
-
-                    double n_inf;
-                    n_inf_max = 0;
-                    for (unsigned int index = 0;
-                         index < dsolve::DENDROSOLVER_NUM_VARS; index++) {
-                        n_inf = normLInfty(m_uiVarIm[index] + nodeLocalBegin,
-                                           m_uiVar[index] + nodeLocalBegin,
-                                           (nodeLocalEnd - nodeLocalBegin),
-                                           m_uiMesh->getMPICommunicator());
-                        if (n_inf > n_inf_max) n_inf_max = n_inf;
-                    }
-                }
-
-                // below all reduction is act as an barrier for inactive procs.
-                par::Mpi_Allreduce(&n_inf_max, &n_inf_max_g, 1, MPI_MAX,
-                                   m_uiComm);
-                n_inf_max = n_inf_max_g;
-
-                if (n_inf_max > dsolve::DENDROSOLVER_RK45_DESIRED_TOL) {
-                    repeatStep = true;
-                    m_uiT_h = dsolve::DENDROSOLVER_SAFETY_FAC * m_uiT_h *
-                              (pow(fabs(dsolve::DENDROSOLVER_RK45_DESIRED_TOL /
-                                        n_inf_max),
-                                   0.25));
-                    if (!m_uiMesh->getMPIRankGlobal())
-                        std::cout << " repeat : " << m_uiCurrentStep
-                                  << " with : " << m_uiT_h << std::endl;
-                } else {
-                    repeatStep = false;
-                    m_uiT_h = dsolve::DENDROSOLVER_SAFETY_FAC * m_uiT_h *
-                              (pow(fabs(dsolve::DENDROSOLVER_RK45_DESIRED_TOL /
-                                        n_inf_max),
-                                   0.20));
-                }
-
-            } while (repeatStep);
+void RK_SOLVER::performSingleIteration() {
+    if (m_uiMesh->isActive()) {
+        if (m_uiRKType == RKType::RK3) {
+            // rk3 solver
+            performSingleIterationRK3();
+        } else if (m_uiRKType == RKType::RK4) {
+            // rk4 solver
+            performSingleIterationRK4();
+        } else if (m_uiRKType == RKType::RK45) {
+            // rk45 solver
+            performSingleIterationRK45();
         }
     }
-
     m_uiMesh->waitAll();
 
     m_uiCurrentStep++;
@@ -1722,22 +1484,30 @@ void RK_SOLVER::rkSolve() {
         if ((m_uiMesh->isActive()) &&
             (m_uiCurrentStep % dsolve::DENDROSOLVER_TIME_STEP_OUTPUT_FREQ) ==
                 0) {
-            // TODO: could generate calculating and printting the l_min and
-            // l_max for literally all of the variables
-            l_min = vecMin(m_uiPrevVar[dsolve::VAR::U_ALPHA] +
-                               m_uiMesh->getNodeLocalBegin(),
-                           (m_uiMesh->getNumLocalMeshNodes()),
-                           m_uiMesh->getMPICommunicator());
-            l_max = vecMax(m_uiPrevVar[dsolve::VAR::U_ALPHA] +
-                               m_uiMesh->getNodeLocalBegin(),
-                           (m_uiMesh->getNumLocalMeshNodes()),
-                           m_uiMesh->getMPICommunicator());
             if (!m_uiMesh->getMPIRank()) {
                 std::cout << "executing step: " << m_uiCurrentStep
                           << " dt: " << m_uiT_h
-                          << " rk_time : " << m_uiCurrentTime << std::endl;
-                std::cout << "\t ||VAR::U_ALPHA|| (min, max) : (" << l_min
-                          << ", " << l_max << " ) " << std::endl;
+                          << " rk_time : " << m_uiCurrentTime
+                          << " nodes: " << m_uiMesh->getNumLocalMeshNodes()
+                          << std::endl;
+            }
+
+            for (const auto tmp_varID :
+                 dsolve::DENDROSOLVER_VAR_ITERABLE_LIST) {
+                l_min = vecMin(
+                    m_uiPrevVar[tmp_varID] + m_uiMesh->getNodeLocalBegin(),
+                    (m_uiMesh->getNumLocalMeshNodes()),
+                    m_uiMesh->getMPICommunicator());
+                l_max = vecMax(
+                    m_uiPrevVar[tmp_varID] + m_uiMesh->getNodeLocalBegin(),
+                    (m_uiMesh->getNumLocalMeshNodes()),
+                    m_uiMesh->getMPICommunicator());
+                if (!(m_uiMesh->getMPIRank())) {
+                    std::cout << "    ||VAR::"
+                              << dsolve::DENDROSOLVER_VAR_NAMES[tmp_varID]
+                              << "|| (min, max) : (" << l_min << ", " << l_max
+                              << " ) " << std::endl;
+                }
             }
 
             dsolve::timer::profileInfoIntermediate(
@@ -1781,14 +1551,10 @@ void RK_SOLVER::rkSolve() {
             else {
                 if (dsolve::DENDROSOLVER_REFINEMENT_MODE ==
                     dsolve::RefinementMode::WAMR) {
-                    // TEMP: make sure this is removed later, just for debugging
-                    // now
-                    isRefine = true;
-                    // isRefine=m_uiMesh->isReMeshUnzip((const double
-                    // **)m_uiUnzipVar,refineVarIds,refineNumVars,waveletTolFunc,dsolve::DENDROSOLVER_DENDRO_AMR_FAC);
-                    // isRefine = dsolve::isReMeshWAMR(m_uiMesh, (const double
-                    // **)m_uiUnzipVar, refineVarIds, refineNumVars,
-                    // waveletTolFunc, dsolve::DENDROSOLVER_DENDRO_AMR_FAC);
+                    isRefine = dsolve::isReMeshWAMR(
+                        m_uiMesh, (const double **)m_uiUnzipVar, refineVarIds,
+                        refineNumVars, waveletTolFunc,
+                        dsolve::DENDROSOLVER_DENDRO_AMR_FAC);
                 } else if (dsolve::DENDROSOLVER_REFINEMENT_MODE ==
                            dsolve::RefinementMode::EH) {
                     isRefine = dsolve::isRemeshEH(
@@ -1812,6 +1578,9 @@ void RK_SOLVER::rkSolve() {
                 } else if (dsolve::DENDROSOLVER_REFINEMENT_MODE ==
                            dsolve::RefinementMode::BH_LOC) {
                     isRefine = dsolve::isRemeshBH(m_uiMesh, m_uiBHLoc);
+                } else if (dsolve::DENDROSOLVER_REFINEMENT_MODE ==
+                           dsolve::RefinementMode::REFINE_MODE_NONE) {
+                    isRefine = false;
                 } else {
                     std::cout << " Error : " << __func__
                               << " invalid refinement mode specified "
@@ -1985,19 +1754,29 @@ void RK_SOLVER::rkSolve() {
 #endif
 
                 if (m_uiMesh->isActive()) {
-                    l_min = vecMin(m_uiPrevVar[dsolve::VAR::U_ALPHA] +
-                                       m_uiMesh->getNodeLocalBegin(),
-                                   (m_uiMesh->getNumLocalMeshNodes()),
-                                   m_uiMesh->getMPICommunicator());
-                    l_max = vecMax(m_uiPrevVar[dsolve::VAR::U_ALPHA] +
-                                       m_uiMesh->getNodeLocalBegin(),
-                                   (m_uiMesh->getNumLocalMeshNodes()),
-                                   m_uiMesh->getMPICommunicator());
                     if (!(m_uiMesh->getMPIRank())) {
-                        std::cout << "transfer completed:    ||VAR::U_ALPHA|| "
-                                     "(min, max) : ("
-                                  << l_min << ", " << l_max << " ) "
-                                  << std::endl;
+                        std::cout << "TRANSFER COMPLETED, VARIABLE SUMMARY FOR "
+                                  << m_uiMesh->getNumLocalMeshNodes()
+                                  << " NODES:" << std::endl;
+                    }
+
+                    for (const auto tmp_varID :
+                         dsolve::DENDROSOLVER_VAR_ITERABLE_LIST) {
+                        l_min = vecMin(m_uiPrevVar[tmp_varID] +
+                                           m_uiMesh->getNodeLocalBegin(),
+                                       (m_uiMesh->getNumLocalMeshNodes()),
+                                       m_uiMesh->getMPICommunicator());
+                        l_max = vecMax(m_uiPrevVar[tmp_varID] +
+                                           m_uiMesh->getNodeLocalBegin(),
+                                       (m_uiMesh->getNumLocalMeshNodes()),
+                                       m_uiMesh->getMPICommunicator());
+                        if (!(m_uiMesh->getMPIRank())) {
+                            std::cout
+                                << "    ||VAR::"
+                                << dsolve::DENDROSOLVER_VAR_NAMES[tmp_varID]
+                                << "|| (min, max) : (" << l_min << ", " << l_max
+                                << " ) " << std::endl;
+                        }
                     }
                 }
             }

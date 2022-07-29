@@ -1,7 +1,7 @@
 /**
  * @author Milinda Fernando / David Van Komen
  * School of Computing, University of Utah
- * @brief Contins utility functions for EMDA simulation
+ * @brief Contins utility functions for GR simulation
  */
 
 #include <math.h>
@@ -92,7 +92,7 @@ double extractConstraints(const ot::Mesh *mesh, const T **constraintVar,
                 mesh, constraintVar[index], maskVec, maskthreshoold);
             if (!rankActive) {
                 std::cout << YLW << "\tConstraint "
-                          << dsolve::DENDROSOLVER_VAR_CONSTRAINT_NAMES[index]
+                          << dsolve::BSSN_VAR_CONSTRAINT_NAMES[index]
                           << " L2 : (" << constraintMaskedL2[index] << " )"
                           << NRM << std::endl;
             }
@@ -108,7 +108,7 @@ double extractConstraints(const ot::Mesh *mesh, const T **constraintVar,
             if (timestep == 0) {
                 fileGW << "TimeStep\tTime\t";
                 for (unsigned int index = 0; index < numConstraints; index++) {
-                    fileGW << dsolve::DENDROSOLVER_VAR_CONSTRAINT_NAMES[index]
+                    fileGW << dsolve::BSSN_VAR_CONSTRAINT_NAMES[index]
                            << "\t";
                 }
                 fileGW << std::endl;

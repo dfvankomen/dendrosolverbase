@@ -40,11 +40,12 @@ void physical_constraints(double **uZipConVars, const double **uZipVars,
 
     # get the current working directory, should be root of project
     current_path = os.getcwd()
-    output_path = os.path.join(current_path, "generated_files")
+    output_folder_from_root = "generated-files"
+    output_path = os.path.join(current_path, "output_folder_from_root)
 
     # the following lines will import any module directly from
-    spec = importlib.util.spec_from_file_location("dendroconf",
-    CONFIG_FILE_PATH) dendroconf = importlib.util.module_from_spec(spec)
+    spec = importlib.util.spec_from_file_location("dendroconf", CONFIG_FILE_PATH) 
+    dendroconf = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = dendroconf
     spec.loader.exec_module(dendroconf)
 
@@ -73,15 +74,16 @@ void physical_constraints(double **uZipConVars, const double **uZipVars,
 
     ]]]*/
     // clang-format on
+    // PARAMETER EXTRACTION FOR CONSTRAINTS
 
     //[[[end]]]
 
     mem::memory_pool<double> *__mem_pool = &DENDROSOLVER_MEM_POOL;
 
     // get derivative workspace
-    double *const deriv_base = emda::EMDA_DERIV_WORKSPACE;
+    double *const deriv_base = dsolve::DENDROSOLVER_DERIV_WORKSPACE;
 
-    // clang-format off
+// clang-format off
     /*[[[cog
     cog.outl('// clang-format on')
     
@@ -97,23 +99,24 @@ void physical_constraints(double **uZipConVars, const double **uZipVars,
 
     print("Finished generating advanced derivatves", file=sys.stderr)
 
-    intermediate_filename = "emda_physcon_intermediate_grad.cpp.inc"
+    intermediate_filename = "solver_physcon_intermediate_grad.cpp.inc"
 
-    with open(os.path.join(output_path, intermediate_filename), "w") as f:
+    with open(os.path.join(output_folder_from_root, intermediate_filename), "w") as f:
         f.write(intermediate_grad_str)
 
     print("Saved them to file", file=sys.stderr)
 
-    cog.outl(f'#include "../gencode/{intermediate_filename}"')
+    cog.outl(f'#include "../{output_folder_from_root}/{intermediate_filename}"')
     
     ]]]*/
-    // clang-format on
+// clang-format on
+// GENERATED ADVANCED DERIVATIVE EQUATIONS
+#include "../generated-files/solver_physcon_intermediate_grad.cpp.inc"
+//[[[end]]]
 
-    //[[[end]]]
-
-    // create the files that have the derivative memory allocations and
-    // calculations
-    // clang-format off
+// create the files that have the derivative memory allocations and
+// calculations
+// clang-format off
     /*[[[cog
     cog.outl('// clang-format on')
 
@@ -121,28 +124,29 @@ void physical_constraints(double **uZipConVars, const double **uZipVars,
 
     print("Generated derivative allocation, calculation, and deallocation code for Evolution", file=sys.stderr)
 
-    alloc_filename = "emda_physcon_deriv_memalloc.cpp.inc"
+    alloc_filename = "solver_physcon_deriv_memalloc.cpp.inc"
 
-    with open(os.path.join(output_path, alloc_filename), "w") as f:
+    with open(os.path.join(output_folder_from_root, alloc_filename), "w") as f:
         f.write(deriv_alloc)
 
-    cog.outl(f'#include "../gencode/{alloc_filename}"')
+    cog.outl(f'#include "../{output_folder_from_root}/{alloc_filename}"')
 
-    calc_filename = "emda_physcon_deriv_calc.cpp.inc"
+    calc_filename = "solver_physcon_deriv_calc.cpp.inc"
 
-    with open(os.path.join(output_path, calc_filename), "w") as f:
+    with open(os.path.join(output_folder_from_root, calc_filename), "w") as f:
         f.write(deriv_calc)
 
-    cog.outl(f'#include "../gencode/{calc_filename}"')
+    cog.outl(f'#include "../{output_folder_from_root}/{calc_filename}"')
 
-    dealloc_filename = "emda_physcon_deriv_memdealloc.cpp.inc"
+    dealloc_filename = "solver_physcon_deriv_memdealloc.cpp.inc"
 
-    with open(os.path.join(output_path, dealloc_filename), "w") as f:
+    with open(os.path.join(output_folder_from_root, dealloc_filename), "w") as f:
         f.write(deriv_dealloc)
 
     ]]]*/
-    // clang-format on
-
+// clang-format on
+#include "../generated-files/solver_physcon_deriv_memalloc.cpp.inc"
+#include "../generated-files/solver_physcon_deriv_calc.cpp.inc"
     //[[[end]]]
 
     // enforce hamiltonian and momentum constraints
@@ -160,30 +164,23 @@ void physical_constraints(double **uZipConVars, const double **uZipVars,
                 const double z = pmin[2] + k * hz;
                 const unsigned int pp = i + nx * (j + ny * k);
 
-                // clang-format off
+// clang-format off
                 /*[[[cog
 
                 cog.outl('// clang-format on')
 
                 physcon_rhs_code = dendroconf.dendroConfigs.generate_rhs_code("constraint", include_rhs_in_name=False)
-                physcon_filename = "emda_physcon_eqns.cpp.inc"
+                physcon_filename = "solver_physcon_eqns.cpp.inc"
 
-                with open(os.path.join(output_path, physcon_filename), "w") as f:
+                with open(os.path.join(output_folder_from_root, physcon_filename), "w") as f:
                     f.write(physcon_rhs_code)
                 
-                cog.outl(f'#include "../gencode/{physcon_filename}"')
+                cog.outl(f'#include "../{output_folder_from_root}/{physcon_filename}"')
                 
                 ]]]*/
-                // clang-format on
-
+// clang-format on
+#include "../generated-files/solver_physcon_eqns.cpp.inc"
                 //[[[end]]]
-
-                // TODO: represent this somehow with Python
-                if (fabs(x) <= 1e-7 && fabs(y) <= 1e-7) {
-                    std::cerr << "ABS OF X AND Y <= 1e-7" << std::endl;
-                    psi4_real[pp] = 0.0;
-                    psi4_imag[pp] = 0.0;
-                }
             }
         }
     }
@@ -195,11 +192,12 @@ void physical_constraints(double **uZipConVars, const double **uZipVars,
 
     cog.outl(deallocate_intermediate_grad_str)
 
-    cog.outl(f'#include "../gencode/{dealloc_filename}"')
+    cog.outl(f'#include "../{output_folder_from_root}/{dealloc_filename}"')
     
 
     ]]]*/
     // clang-format on
 
+#include "../generated-files/solver_physcon_deriv_memdealloc.cpp.inc"
     //[[[end]]]
 }

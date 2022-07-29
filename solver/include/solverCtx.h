@@ -2,8 +2,7 @@
  * @file dsolveCtx.h
  * @author Milinda Fernando
  * @author David Van Komen
- * @brief Application context class for solving the Einstein equations in EMDA
- * formulation.
+ * @brief Application context class for solving the Einstein equations a formulation.
  * @version 0.1
  * @date 2019-12-20
  *
@@ -86,7 +85,7 @@ class SOLVERCtx : public ts::Ctx<SOLVERCtx, DendroScalar, DendroIntL> {
     int init_grid();
 
     /**
-     * @brief computes the EMDA rhs
+     * @brief computes the Right Hand Side
      *
      * @param in : zipped input
      * @param out : zipped output

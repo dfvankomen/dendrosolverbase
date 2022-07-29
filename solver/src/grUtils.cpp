@@ -3,7 +3,7 @@
 /**
  *@author Milinda Fernando
  *School of Computing, University of Utah
- *@brief Contains utility functions for EMDA simulation.
+ *@brief Contains utility functions for GR simulation.
  */
 //
 
@@ -21,6 +21,10 @@ namespace dsolve {
 // NOTE: the read param file and dump param file are now included in
 // parameters.cpp
 
+double inline rand_uniform_mid_range(const double mid, const double range){
+    return ((double)rand() / RAND_MAX * (2 * range)) - mid;
+}
+
 void initDataFuncToPhysCoords(const double xx1, const double yy1,
                               const double zz1, double *var) {
     // convert "grid" values to physical values
@@ -30,6 +34,10 @@ void initDataFuncToPhysCoords(const double xx1, const double yy1,
 
     // TODO: perform a "switch" here for different initialization functions?
     minkowskiInit(xx, yy, zz, var);
+}
+
+void minkowskiInit(const double xx, const double yy, const double zz, double *var){
+
 }
 
 // clang-format off
@@ -57,6 +65,13 @@ cog.outl(dendroconf.dendroConfigs.generate_initial_data_code(var_type="evolution
 // clang-format off
 
 //[[[end]]]
+
+void noiseData(const double xx, const double yy, const double zz,
+               double *var){
+
+#include "src/initial_data_types/noiseInit.cpp"
+
+}
 
 void punctureDataPhysicalCoord(const double xx, const double yy,
                                const double zz, double *var) {
@@ -290,7 +305,6 @@ void punctureDataPhysicalCoord(const double xx, const double yy,
         vpsibl_u2 = vpsibl + v_u_corr;
 
         //////// TODO: HUGE: MAKE SURE THIS WORKS!
-        // TODO: generate these for EMDA
 
         var[VAR::U_ALPHA] = 1.0 / (vpsibl_u * vpsibl_u);
         //std::cout<<"Alpha: "<<u[U_ALPHA]<<" vpsibl_u: "<< vpsibl_u<<std::endl;
@@ -535,7 +549,6 @@ void punctureData(const double xx1, const double yy1, const double zz1,
 
             double tmp_Atilde = ((alpha * Rsq_dalpha_dR - bh_mass) / tmp_sqrt - bigR * tmp_sqrt) / bigR / bigR;
 
-            // TODO: fix this for EMDA?
             var[VAR::U_ALPHA] = alpha;
             var[VAR::U_ALPHA] = std::max(var[VAR::U_ALPHA], PHI_FLOOR);
 
@@ -1466,15 +1479,15 @@ void allocate_deriv_workspace(const ot::Mesh *pMesh, unsigned int s_fac) {
     deallocate_deriv_workspace();
 
     // allocate the new memory
-    emda::EMDA_DERIV_WORKSPACE = new double[s_fac * max_blk_sz * emda::EMDA_NUM_DERIVATIVES];
+    dsolve::DENDROSOLVER_DERIV_WORKSPACE = new double[s_fac * max_blk_sz * dsolve::DENDROSOLVER_NUM_DERIVATIVES];
 
 }
 
 void deallocate_deriv_workspace() {
     // if the pointer isn't already null, delete the allocated memory 
-    if (emda::EMDA_DERIV_WORKSPACE != nullptr) {
-        delete[] emda::EMDA_DERIV_WORKSPACE;
-        emda::EMDA_DERIV_WORKSPACE = nullptr;
+    if (dsolve::DENDROSOLVER_DERIV_WORKSPACE != nullptr) {
+        delete[] dsolve::DENDROSOLVER_DERIV_WORKSPACE;
+        dsolve::DENDROSOLVER_DERIV_WORKSPACE = nullptr;
     }
 }
 

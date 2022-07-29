@@ -127,7 +127,7 @@ class RK_SOLVER : public RK {
     /** @brief default destructor */
     ~RK_SOLVER();
 
-    /** @brief: read parameters related to EMDA simulation and store them in
+    /** @brief: read parameters related to GR simulation and store them in
      * static variables defined in parameters.h*/
     void readConfigFile(const char *fName);
 
@@ -182,6 +182,21 @@ class RK_SOLVER : public RK {
                     unsigned int numEvolVars, unsigned int numConstVars,
                     const unsigned int *evolVarIndices,
                     const unsigned int *constVarIndices, bool zslice = false);
+
+    /** @brief Implementation of the Runge-Kutta "3" Method for a single
+     * iteration */
+    void performSingleIterationRK3();
+
+    /** @brief Implementation of the Runge-Kutta "4" Method for a single
+     * iteration
+     *
+     * This method is the most common or "classic" method of Runge-Kutta solving
+     */
+    void performSingleIterationRK4();
+
+    /** @brief Implementation of the Runge-Kutta "45" Method for a single
+     * iteration */
+    void performSingleIterationRK45();
 
     /**@brief: Implementation of the base class time step function*/
     void performSingleIteration();

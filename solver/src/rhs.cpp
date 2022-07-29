@@ -24,7 +24,7 @@ void dendroSolverRHS(double **uzipVarsRHS, const double **uZipVars,
 #ifdef DENDROSOLVER_ENABLE_CUDA
 
     // TODO: generate CUDA-based stuff
-    cuda::EMDAComputeParams dsolveParams;
+    cuda::SOLVERComputeParams dsolveParams;
     dsolveParams.DENDROSOLVER_LAMBDA[0] = dsolve::DENDROSOLVER_LAMBDA[0];
     dsolveParams.DENDROSOLVER_LAMBDA[1] = dsolve::DENDROSOLVER_LAMBDA[1];
     dsolveParams.DENDROSOLVER_LAMBDA[2] = dsolve::DENDROSOLVER_LAMBDA[2];
@@ -44,7 +44,7 @@ void dendroSolverRHS(double **uzipVarsRHS, const double **uZipVars,
 
     dim3 threadBlock(16, 16, 1);
     cuda::computeRHS(uzipVarsRHS, (const double **)uZipVars, blkList, numBlocks,
-                     (const cuda::EMDAComputeParams *)&dsolveParams,
+                     (const cuda::SOLVERComputeParams *)&dsolveParams,
                      threadBlock, pt_min, pt_max, 1);
 #else
 
@@ -99,8 +99,8 @@ void dendroSolverRHSUnpacked(double **unzipVarsRHS, const double **uZipVars,
     cog.outl('// clang-format on')
 
     # get the current working directory, should be root of project
-    current_path = os.getcwd()
-    output_path = os.path.join(current_path, "gencode")
+    output_folder_from_root = "generated-files"
+    output_path = output_folder_from_root
 
     # the following lines will import any module directly from
     spec = importlib.util.spec_from_file_location("dendroconf", CONFIG_FILE_PATH)
@@ -154,8 +154,8 @@ void dendroSolverRHSUnpacked(double **unzipVarsRHS, const double **uZipVars,
     // declare the size of bytes for memory allocation down the line
     const unsigned int bytes = n * sizeof(double);
 
-    // Create the necessary pre-derivatives
-    // clang-format off
+// Create the necessary pre-derivatives
+// clang-format off
     /*[[[cog
     cog.outl('// clang-format on')
 
@@ -171,25 +171,26 @@ void dendroSolverRHSUnpacked(double **unzipVarsRHS, const double **uZipVars,
 
     print("Finished generating advanced derivatves", file=sys.stderr)
 
-    intermediate_filename = "emda_rhs_intermediate_grad.cpp.inc"
+    intermediate_filename = "bssn_rhs_intermediate_grad.cpp.inc"
 
     with open(os.path.join(output_path, intermediate_filename), "w") as f:
         f.write(intermediate_grad_str)
 
     print("Saved them to file", file=sys.stderr)
 
-    cog.outl(f'#include "../gencode/{intermediate_filename}"')
+    cog.outl(f'#include "../{output_path}/{intermediate_filename}"')
 
     ]]]*/
     // clang-format on
-
+    //GENERATED ADVANCED DERIVATIVE EQUATIONS
+    #include "../generated-files/solver_rhs_intermediate_grad.cpp.inc"
     //[[[end]]]
 
     dsolve::timer::t_deriv.start();
 
-    // create the files that have the derivative memory allocations and
-    // calculations
-    // clang-format off
+// create the files that have the derivative memory allocations and
+// calculations
+// clang-format off
     /*[[[cog
     
 
@@ -197,29 +198,30 @@ void dendroSolverRHSUnpacked(double **unzipVarsRHS, const double **uZipVars,
 
     print("Generated derivative allocation, calculation, and deallocation code for Evolution", file=sys.stderr)
 
-    alloc_filename = "emda_rhs_deriv_memalloc.cpp.inc"
+    alloc_filename = "solver_rhs_deriv_memalloc.cpp.inc"
 
     with open(os.path.join(output_path, alloc_filename), "w") as f:
         f.write(deriv_alloc)
     
-    cog.outl(f'#include "../gencode/{alloc_filename}"')
+    cog.outl(f'#include "../{output_folder_from_root}/{alloc_filename}"')
 
-    calc_filename = "emda_rhs_deriv_calc.cpp.inc"
+    calc_filename = "solver_rhs_deriv_calc.cpp.inc"
 
     with open(os.path.join(output_path, calc_filename), "w") as f:
         f.write(deriv_calc)
     
-    cog.outl(f'#include "../gencode/{calc_filename}"')
+    cog.outl(f'#include "../{output_folder_from_root}/{calc_filename}"')
 
-    dealloc_filename = "emda_rhs_deriv_memdealloc.cpp.inc"
+    dealloc_filename = "solver_rhs_deriv_memdealloc.cpp.inc"
 
     with open(os.path.join(output_path, dealloc_filename), "w") as f:
         f.write(deriv_dealloc)
 
     cog.outl('// clang-format on')
     ]]]*/
+    #include "../generated-files/solver_rhs_deriv_memalloc.cpp.inc"
+    #include "../generated-files/solver_rhs_deriv_calc.cpp.inc"
     // clang-format on
-
     //[[[end]]]
 
     dsolve::timer::t_deriv.stop();
@@ -243,29 +245,29 @@ void dendroSolverRHSUnpacked(double **unzipVarsRHS, const double **uZipVars,
                 const unsigned int pp = i + nx * (j + ny * k);
                 const double r_coord = sqrt(x * x + y * y + z * z);
 
-                // TODO: this was here before! Is it something we need in
-                // BSSN??? double eta = ETA_CONST;
+// TODO: this was here before! Is it something we need in
+// BSSN??? double eta = ETA_CONST;
 
-                // if (r_coord >= ETA_R0)
-                // {
-                //     eta *= pow((ETA_R0 / r_coord), ETA_DAMPING_EXP);
-                // }
+// if (r_coord >= ETA_R0)
+// {
+//     eta *= pow((ETA_R0 / r_coord), ETA_DAMPING_EXP);
+// }
 
-                // clang-format off
+// clang-format off
                 /*[[[cog
                 cog.outl('// clang-format on')
 
                 evolution_rhs_code = dendroconf.dendroConfigs.generate_rhs_code("evolution")
-                evolution_filename = "emda_rhs_eqns.cpp.inc"
+                evolution_filename = "solver_rhs_eqns.cpp.inc"
 
                 with open(os.path.join(output_path, evolution_filename), "w") as f:
                     f.write(evolution_rhs_code)
                 
-                cog.outl(f'#include "../gencode/{evolution_filename}"')
+                cog.outl(f'#include "../{output_folder_from_root}/{evolution_filename}"')
                 
                 ]]]*/
                 // clang-format on
-
+                #include "../generated-files/solver_rhs_eqns.cpp.inc"
                 //[[[end]]]
 
                 // /* debugging */
@@ -312,7 +314,7 @@ void dendroSolverRHSUnpacked(double **unzipVarsRHS, const double **uZipVars,
 
     dsolve::timer::t_deriv.start();
 // TODO: include more types of build options
-#include "../../gencode/solver_rhs_ko_deriv_calc.cpp.inc"
+#include "../../generated-files/solver_rhs_ko_deriv_calc.cpp.inc"
     dsolve::timer::t_deriv.stop();
 
     dsolve::timer::t_rhs.start();
@@ -348,15 +350,15 @@ void dendroSolverRHSUnpacked(double **unzipVarsRHS, const double **uZipVars,
     dsolve::timer::t_rhs.stop();
 
     dsolve::timer::t_deriv.start();
-    // clang-format off
+// clang-format off
     /*[[[cog
     cog.outl('// clang-format on')
 
-    cog.outl(f'#include "../gencode/{dealloc_filename}"')
+    cog.outl(f'#include "../{output_folder_from_root}/{dealloc_filename}"')
 
     ]]]*/
     // clang-format on
-
+    #include "../generated-files/solver_rhs_deriv_memdealloc.cpp.inc"
     //[[[end]]]
 
     dsolve::timer::t_deriv.stop();
@@ -632,61 +634,6 @@ void freeze_bcs(double *f_rhs, const unsigned int *sz,
     }
 }
 
-/*----------------------------------------------------------------------;
- *
- * HAD RHS
- *
- *----------------------------------------------------------------------*/
-void call_HAD_rhs() {
-    // NOTE: had to remove this due to a build error
-    // had_solver_rhs_();
-    // TODO: investigate this
-}
-
-#if 0
-/*--------------------------------------------------------------
- * Kerr-Schild data
- *--------------------------------------------------------------*/
-
-void ks_initial_data(double x, double y, double z, double *u)
-{
-
-    u[VAR::U_ALPHA] = 0.0;
-    u[VAR::U_BETA0] = 0.0;
-    u[VAR::U_BETA1] = pi/5.0*cos(y)*sin(z+x);
-    u[VAR::U_BETA2] = 4.0/17.0*sin(f2*x)*sin(z);
-
-    u[VAR::U_B0] = 0.0;
-    u[VAR::U_B1] = 0.0;
-    u[VAR::U_B2] = 0.0;
-
-    u[VAR::U_GT0] = Gamt_1;
-    u[VAR::U_GT1] = Gamt_2;
-    u[VAR::U_GT2] = Gamt_3;
-
-    u[VAR::U_CHI] = 1.0 + exp(-4.0*cos(x)*sin(y));
-
-    u[VAR::U_SYMGT0] = 1.00+0.2*sin(x+z)*cos(y);
-    u[VAR::U_SYMGT3] = 1.00+0.2*cos(y)*cos(z+ x);
-    u[VAR::U_SYMGT5] = 1.00 / ( u[VAR::U_SYMGT0] + u[VAR::U_SYMGT3]);
-    u[VAR::U_SYMGT1] = 0.7*cos(x*x + y*y);
-    u[VAR::U_SYMGT2] = 0.3*sin(z)*cos(x);
-    u[VAR::U_SYMGT4] = -0.5*sin(x*x)*cos(y)*cos(z);
-
-    u[VAR::U_K] = 5.0*exp(-4.0*cos(x)*sin(y))/(5.0+sin(x))*cos(x)
-                  +5.0*exp(-4.0*cos(x)*sin(y))/(5.0+cos(y))*cos(y)
-                  +0.4*(25.0+5.0*cos(y)+5.0*sin(x)+sin(x)*cos(y))
-                  *exp(-4.0*cos(x)*sin(y))*cos(z);
-
-    u[VAR::U_SYMAT0] = exp(-4.0*cos(x)*sin(y))*(cos(x) -0.3333333333*exp(4.0*cos(x)*sin(y)) *(1.0+0.2*sin(x))*(5.0*exp(-4.0*cos(x)*sin(y)) /(5.0+sin(x))*cos(x)+5.0*exp(-4.0*cos(x)*sin(y)) /(5.0+cos(y))*cos(y)+0.04*(25.0+5.0*cos(y) +5.0*sin(x)+sin(x)*cos(y))*exp(-4.0*cos(x)*sin(y))*cos(z)));
-    u[VAR::U_SYMAT1] = 1.0 + x*z/(0.1 + x*x + y*y + z*z);
-    u[VAR::U_SYMAT2] = 1.3 - x*y/(3.0 + x*x + 2.0*y*y + z*z)*(x*x+z*z);
-    u[VAR::U_SYMAT3] = exp(-4.0*cos(x)*sin(y))*(cos(y)-0.33333333330*exp(4*cos(x)*sin(y))*(1+0.2*cos(y))*(5.0*exp(-4.0*cos(x)*sin(y))/(5.0+sin(x))*cos(x)+5.0*exp(-4.0*cos(x)*sin(y))/(5.0+cos(y))*cos(y)+0.04*(25.0+5.0*cos(y)+5.0*sin(x)+sin(x)*cos(y))*exp(-4.0*cos(x)*sin(y))*cos(z)));
-    u[VAR::U_SYMAT4] = -1.0 + y*z/(1.0 + 3.0*x*x + y*y + z*z);
-    u[VAR::U_SYMAT5] = exp(-4.0*cos(x)*sin(y))*(cos(z)-0.3333333333*exp(4*cos(x)*sin(y))/(1+0.2*sin(x))/(1+0.2*cos(y))*(5.0*exp(-4.0*cos(x)*sin(y))/(5.0+sin(x))*cos(x)+5.0*exp(-4.0*cos(x)*sin(y))/(5.0+cos(y))*cos(y)+0.04*(25.0+5.0*cos(y)+5.0*sin(x)+sin(x)*cos(y))*exp(-4.0*cos(x)*sin(y))*cos(z)));
-
-}
-#endif
 /*----------------------------------------------------------------------;
  *
  *

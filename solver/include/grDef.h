@@ -82,6 +82,12 @@ cog.outl(dendroconf.dendroConfigs.gen_enum_iterable_list("constraint", enum_name
 
 //[[[end]]]
 
+// TODO: make another reference to the pointer array
+static const char *DENDROSOLVER_VAR_NAMES[] = {"U_ALPHA", "U_CHI", "U_K", "U_GT0", "U_GT1", "U_GT2", "U_BETA0", "U_BETA1", "U_BETA2", "U_B0", "U_B1", "U_B2", "U_GT00", "U_GT01", "U_GT02", "U_GT11", "U_GT12", "U_GT22", "U_AT00", "U_AT01", "U_AT02", "U_AT11", "U_AT12", "U_AT22"};
+static const char *DENDROSOLVER_VAR_CONSTRAINT_NAMES[] = {"C_HAM", "C_MOM0", "C_MOM1", "C_MOM2", "C_PSI4_REAL", "C_PSI4_IMAG"};
+static const VAR DENDROSOLVER_VAR_ITERABLE_LIST[] = {U_ALPHA, U_CHI, U_K, U_GT0, U_GT1, U_GT2, U_BETA0, U_BETA1, U_BETA2, U_B0, U_B1, U_B2, U_GT00, U_GT01, U_GT02, U_GT11, U_GT12, U_GT22, U_AT00, U_AT01, U_AT02, U_AT11, U_AT12, U_AT22};
+static const VAR_CONSTRAINT DENDROSOLVER_VAR_CONSTRAINT_ITERABLE_LIST[] = {C_HAM, C_MOM0, C_MOM1, C_MOM2, C_PSI4_REAL, C_PSI4_IMAG};
+
 /**
  * @brief Refinement mode types.
  * WAMR : Wavelet based refinement.
@@ -93,7 +99,8 @@ enum RefinementMode {
     WAMR = 0,
     EH,
     EH_WAMR,
-    BH_LOC
+    BH_LOC,
+    REFINE_MODE_NONE
 };  // TODO: generate the different types of refinement, for now they're these
 
 }  // end of namespace dsolve

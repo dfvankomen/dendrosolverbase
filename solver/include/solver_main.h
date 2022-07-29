@@ -1,8 +1,8 @@
 /**
- * This is the header file for the EMDA Formulation of GR Simulation
+ * This is the header file for the Formulation of GR Simulation
  *
  * @author David Van Komen, Milinda Fernando
- * @brief EMDA formulation of GR simulations, this houses "main"
+ * @brief Solver for formulation of GR simulations, this houses "main"
  *
  * :::License:::
  */
@@ -14,7 +14,7 @@
 #include <vector>
 
 #include "../dendro/include/dendroProfileParams.h"
-#include "dsolveCtx.h"
+#include "solverCtx.h"
 #include "enuts.h"
 #include "ets.h"
 

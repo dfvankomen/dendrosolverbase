@@ -29,11 +29,10 @@ void enforce_solver_constraints(double **uiVar, const unsigned int node) {
     sys.modules[spec.name] = dendroconf
     spec.loader.exec_module(dendroconf)
 
-    cog.outl('//// EMDA CONSTRAINTS')
+    cog.outl('//// SOLVER CONSTRAINTS')
     cog.outl(dendroconf.dendroConfigs.generate_evolution_constraints())
 
     ]]]*/
-    // clang-format on
 
     //[[[end]]]
 }

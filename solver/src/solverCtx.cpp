@@ -1,7 +1,7 @@
 /**
  * @file dsolveCtx.cpp
  * @author Milinda Fernando (milinda@cs.utah.edu)
- * @brief EMDA contex file.
+ * @brief Solver contex file.
  * @version 0.1
  * @date 2019-12-20
  *
@@ -208,7 +208,7 @@ int SOLVERCtx::init_grid() {
     if (dsolve::DENDROSOLVER_ID_TYPE == 0) {
         // TODO: remove this call, this should *not* exit, yet it will
         std::cout << "WARNING: TWO PUNCTURE CODE CALLED, THIS IS UNSUPPORTED "
-                     "IN EMDA FOR NOW"
+                     "IN THE SOLVER FOR NOW, WILL NEED CUSTOM HANDLING"
                   << std::endl;
         exit(EXIT_FAILURE);
         TP_MPI_COMM = m_uiMesh->getMPIGlobalCommunicator();
@@ -262,61 +262,12 @@ int SOLVERCtx::init_grid() {
                             x = GRIDX_TO_X(x);
                             y = GRIDY_TO_Y(y);
                             z = GRIDZ_TO_Z(z);
-                            dsolve::superposedBoostedKerrSenInit(
-                                (double)x, (double)y, (double)z, var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 3) {
-                            // NOTE: this one was just noise data
-
-                            // DO BOOSTED KERR SEN INIT
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
-                            dsolve::boostedKerrSenInit((double)x, (double)y,
-                                                       (double)z, var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 4) {
-                            // NOTE: this one was "fake_initial_data"
-
-                            // DO KERRSEN INIT
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
-                            dsolve::kerrsenInit((double)x, (double)y, (double)z,
-                                                var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 5) {
-                            // DO SCHwARZSCHILD INIT
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
-                            dsolve::schwarzschildInit((double)x, (double)y,
-                                                      (double)z, var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 6) {
-                            // DO FRANKENSTEIN INIT
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
-                            dsolve::frankensteinInit((double)x, (double)y,
-                                                     (double)z, var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 7) {
-                            // DO DYONIC KERR NEWMAN INIT
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
-                            dsolve::dyonicKerrNewmanInit((double)x, (double)y,
-                                                         (double)z, var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 8) {
-                            // DO MINKOWSKI INIT
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
                             dsolve::minkowskiInit((double)x, (double)y,
                                                   (double)z, var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 9) {
-                            // DO NOISE INIT
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
-                            dsolve::noiseInit((double)x, (double)y, (double)z,
-                                              var);
+                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 3) {
+                            dsolve::noiseData((double)GRIDX_TO_X(x),
+                                              (double)GRIDY_TO_Y(y),
+                                              (double)GRIDZ_TO_Z(z), var);
                         } else {
                             std::cout << "Unknown ID type: "
                                       << dsolve::DENDROSOLVER_ID_TYPE
@@ -383,7 +334,7 @@ int SOLVERCtx::rhs(DVec *in, DVec *out, unsigned int sz, DendroScalar time) {
 }
 
 int SOLVERCtx::rhs_blkwise(DVec in, DVec out, const unsigned int *const blkIDs,
-                         unsigned int numIds, DendroScalar *blk_time) const {
+                           unsigned int numIds, DendroScalar *blk_time) const {
     DendroScalar **unzipIn;
     DendroScalar **unzipOut;
 
@@ -448,8 +399,8 @@ int SOLVERCtx::rhs_blkwise(DVec in, DVec out, const unsigned int *const blkIDs,
 }
 
 int SOLVERCtx::rhs_blk(const DendroScalar *in, DendroScalar *out,
-                     unsigned int dof, unsigned int local_blk_id,
-                     DendroScalar blk_time) const {
+                       unsigned int dof, unsigned int local_blk_id,
+                       DendroScalar blk_time) const {
     // return 0;
     // std::cout<<"solver_rhs"<<std::endl;
     DendroScalar **unzipIn = new DendroScalar *[dof];
@@ -539,8 +490,8 @@ int SOLVERCtx::rhs_blk(const DendroScalar *in, DendroScalar *out,
 }
 
 int SOLVERCtx::pre_stage_blk(DendroScalar *in, unsigned int dof,
-                           unsigned int local_blk_id,
-                           DendroScalar blk_time) const {
+                             unsigned int local_blk_id,
+                             DendroScalar blk_time) const {
     DendroScalar **unzipIn = new DendroScalar *[dof];
     const unsigned int blk = local_blk_id;
 
@@ -597,20 +548,20 @@ int SOLVERCtx::pre_stage_blk(DendroScalar *in, unsigned int dof,
 }
 
 int SOLVERCtx::post_stage_blk(DendroScalar *in, unsigned int dof,
-                            unsigned int local_blk_id,
-                            DendroScalar blk_time) const {
-    return 0;
-}
-
-int SOLVERCtx::pre_timestep_blk(DendroScalar *in, unsigned int dof,
                               unsigned int local_blk_id,
                               DendroScalar blk_time) const {
     return 0;
 }
 
+int SOLVERCtx::pre_timestep_blk(DendroScalar *in, unsigned int dof,
+                                unsigned int local_blk_id,
+                                DendroScalar blk_time) const {
+    return 0;
+}
+
 int SOLVERCtx::post_timestep_blk(DendroScalar *in, unsigned int dof,
-                               unsigned int local_blk_id,
-                               DendroScalar blk_time) const {
+                                 unsigned int local_blk_id,
+                                 DendroScalar blk_time) const {
     DendroScalar **unzipIn = new DendroScalar *[dof];
     const unsigned int blk = local_blk_id;
 
@@ -1075,8 +1026,9 @@ int SOLVERCtx::restore_checkpt() {
     par::Mpi_Allreduce(&restoreStatus, &restoreStatusGlobal, 1, MPI_MAX, comm);
     if (restoreStatusGlobal == 1) {
         if (!rank)
-            std::cout << "[SOLVERCtx]: octree (*.oct) restore file is corrupted "
-                      << std::endl;
+            std::cout
+                << "[SOLVERCtx]: octree (*.oct) restore file is corrupted "
+                << std::endl;
         MPI_Abort(comm, 0);
     }
 
@@ -1319,7 +1271,7 @@ unsigned int SOLVERCtx::compute_lts_ts_offset() {
 }
 
 unsigned int SOLVERCtx::getBlkTimestepFac(unsigned int blev, unsigned int lmin,
-                                        unsigned int lmax) {
+                                          unsigned int lmax) {
     const unsigned int ldiff = DENDROSOLVER_LTS_TS_OFFSET;
     if ((lmax - blev) <= ldiff)
         return 1;
