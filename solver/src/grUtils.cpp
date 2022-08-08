@@ -1528,14 +1528,6 @@ void initFlops() {
     t_deriv.start();
     t_rhs.start();
 
-    t_rhs_a.start();
-    t_rhs_b.start();
-    t_rhs_gt.start();
-    t_rhs_chi.start();
-    t_rhs_At.start();
-    t_rhs_K.start();
-    t_rhs_Gt.start();
-    t_rhs_B.start();
 
     t_bdyc.start();
 
@@ -1579,14 +1571,6 @@ void resetSnapshot() {
     t_deriv.snapreset();
     t_rhs.snapreset();
 
-    t_rhs_a.snapreset();
-    t_rhs_b.snapreset();
-    t_rhs_gt.snapreset();
-    t_rhs_chi.snapreset();
-    t_rhs_At.snapreset();
-    t_rhs_K.snapreset();
-    t_rhs_Gt.snapreset();
-    t_rhs_B.snapreset();
 
     t_bdyc.snapreset();
 
@@ -2623,126 +2607,6 @@ void profileInfoIntermediate(const char *filePrefix, const ot::Mesh *pMesh,
     if (!rank)
         outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
                 << "  ++compute_rhs ";
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[0];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[1];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[2] << std::endl;
-
-    t_stat = t_rhs_a.snap;
-    computeOverallStats(&t_stat, t_stat_g, comm);
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << "  --compute_rhs_a ";
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[0];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[1];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[2] << std::endl;
-
-    t_stat = t_rhs_b.snap;
-    computeOverallStats(&t_stat, t_stat_g, comm);
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << "  --compute_rhs_b ";
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[0];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[1];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[2] << std::endl;
-
-    t_stat = t_rhs_gt.snap;
-    computeOverallStats(&t_stat, t_stat_g, comm);
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << "  --compute_rhs_gt ";
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[0];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[1];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[2] << std::endl;
-
-    t_stat = t_rhs_chi.snap;
-    computeOverallStats(&t_stat, t_stat_g, comm);
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << "  --compute_rhs_chi ";
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[0];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[1];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[2] << std::endl;
-
-    t_stat = t_rhs_At.snap;
-    computeOverallStats(&t_stat, t_stat_g, comm);
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << "  --compute_rhs_At ";
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[0];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[1];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[2] << std::endl;
-
-    t_stat = t_rhs_K.snap;
-    computeOverallStats(&t_stat, t_stat_g, comm);
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << "  --compute_rhs_K ";
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[0];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[1];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[2] << std::endl;
-
-    t_stat = t_rhs_Gt.snap;
-    computeOverallStats(&t_stat, t_stat_g, comm);
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << "  --compute_rhs_Gt ";
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[0];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[1];
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << t_stat_g[2] << std::endl;
-
-    t_stat = t_rhs_B.snap;
-    computeOverallStats(&t_stat, t_stat_g, comm);
-    if (!rank)
-        outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
-                << "  --compute_rhs_B ";
     if (!rank)
         outfile << std::left << std::setw(nameWidth) << std::setfill(separator)
                 << t_stat_g[0];

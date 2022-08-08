@@ -32,14 +32,6 @@ extern profiler_t t_rhs;
 
 // TODO: profilers for other RHS variables? Generate these if going for separate
 // calculations
-extern profiler_t t_rhs_a;
-extern profiler_t t_rhs_b;
-extern profiler_t t_rhs_gt;
-extern profiler_t t_rhs_chi;
-extern profiler_t t_rhs_At;
-extern profiler_t t_rhs_K;
-extern profiler_t t_rhs_Gt;
-extern profiler_t t_rhs_B;
 
 extern profiler_t t_bdyc;
 

@@ -30,15 +30,6 @@ profiler_t t_unzip_async;
 profiler_t t_deriv;
 profiler_t t_rhs;
 
-profiler_t t_rhs_a;
-profiler_t t_rhs_b;
-profiler_t t_rhs_gt;
-profiler_t t_rhs_chi;
-profiler_t t_rhs_At;
-profiler_t t_rhs_K;
-profiler_t t_rhs_Gt;
-profiler_t t_rhs_B;
-
 profiler_t t_bdyc;
 
 profiler_t t_zip;
