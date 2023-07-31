@@ -9,9 +9,7 @@
 # directories such as src/ and dendro/
 # ##############################################################################
 
-# NOTE: the current cmake minimum is set to 2.8, but all later versions work
-# (and should honestly be considered)
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.1)
 
 # full project name and the languages used
 project(DendroSOLVER C CXX Fortran)
@@ -103,11 +101,15 @@ option(
 option(WITH_CUDA " build dendro with cuda " OFF)
 option(BUILD_WITH_PETSC " build dendro with PETSC " OFF)
 option(USE_FD_INTERP_FOR_UNZIP "use FD style interpolation for unzip" OFF)
+option(MPIX_CUDA_AWARE_SUPPORT "use FD style interpolation for unzip" OFF)
 
 # option(KWAY "K parameter for alltoallv_kway" 128)
 set(KWAY
     128
     CACHE STRING 128)
+set(OCT2BLK_COARSEST_LEV
+    0
+    CACHE STRING 0)
 set(NUM_NPES_THRESHOLD
     2
     CACHE STRING 2)
@@ -124,67 +126,49 @@ endif()
 # == CUDA PACKAGE FINDING ==
 # ==========================
 if(WITH_CUDA)
+  set(OCT2BLK_COARSEST_LEV
+      31
+      CACHE STRING 31)
+  add_definitions(-DOCT2BLK_COARSEST_LEV=${OCT2BLK_COARSEST_LEV})
   find_package(CUDA REQUIRED)
   if(CUDA_FOUND)
-    set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+    set(CUDA_PROPAGATE_HOST_FLAGS ON)
     set(CUDA_SEPARABLE_COMPILATION ON)
-
-    # list( APPEND CUDA_NVCC_FLAGS -gencode arch=compute_30,code=sm_30) list(
-    # APPEND CUDA_NVCC_FLAGS -gencode arch=compute_50,code=sm_50) list( APPEND
-    # CUDA_NVCC_FLAGS -gencode arch=compute_60,code=sm_60) list( APPEND
-    # CUDA_NVCC_FLAGS --generate-line-info) list( APPEND CUDA_NVCC_FLAGS
-    # -gencode arch=compute_61,code=sm_61)
-
-    # list( APPEND CUDA_NVCC_FLAGS -use_fast_math ) list( APPEND CUDA_NVCC_FLAGS
-    # -maxrregcount 64 )
-    list(APPEND CUDA_NVCC_FLAGS -std=c++11)
-
+    list(
+      APPEND
+      CUDA_NVCC_FLAGS
+      -std=c++11
+      --ptxas-options=-O3
+      --ptxas-options=-v
+      -w
+      -lineinfo)
+    add_definitions(-DWITH_CUDA)
+  endif()
+  if(MPIX_CUDA_AWARE_SUPPORT)
+    add_definitions(-DMPIX_CUDA_AWARE_SUPPORT)
   endif()
 endif()
+add_definitions(-DOCT2BLK_COARSEST_LEV=${OCT2BLK_COARSEST_LEV})
+
 
 # ===== == BLAS and LAPAC FINDING ==
 # ============================
 if(WITH_BLAS_LAPACK)
   add_definitions(-DWITH_BLAS_LAPACK)
-  if(MANUAL_BLAS_LAPACK)
-    if("$ENV{BLAS}" STREQUAL "")
-      message(
-        "Environment Variable BLAS is not set. Please set it to BLAS directory")
-      
-    endif()
+  find_package(BLAS REQUIRED)
+  find_package(LAPACK REQUIRED)
+  set(LAPACK_LINKER_FLAGS -llapacke -llapack -lblas -lgfortran -lquadmath)
+  set(LAPACKE_DIR $ENV{LAPACK}/LAPACKE)
+  set(LINK_FLAGS "${LINK_FLAGS} ${LAPACK_LINKER_FLAGS}")
+  set(LAPACK_LIBRARIES ${LAPACK_LIBRARIES} ${LAPACKE_LIB})
+  message(STATUS ${LAPACK_LIBRARIES})
 
-    if("$ENV{LAPACK}" STREQUAL "")
-      message(
-        "Enviroment Variable LAPACK is note set. Please set it to LAPACK directory. "
-      )
-    endif()
-    set(LAPACKE_DIR $ENV{LAPACK}/LAPACKE)
-    set(BLAS_LIBS $ENV{BLAS}/lib)
-    set(LAPACK_LIBS $ENV{LAPACK}/lib)
-    set(LAPACK_LINKER_FLAGS -llapacke -llapack -lblas -lgfortran -lquadmath)
-    set(LAPACK_LIBRARIES
-        ${LAPACK_LIBS}/liblapacke.a ${LAPACK_LIBS}/liblapack.a
-        ${BLAS_LIBS}/libblas.a -static libgfortran.a libquadmath.a)
-    set(LINK_FLAGS "${LINK_FLAGS} ${LAPACK_LINKER_FLAGS}")
-  else()
-    find_package(BLAS REQUIRED)
-    find_package(LAPACK REQUIRED)
-    set(LAPACK_LINKER_FLAGS -llapacke -llapack -lblas -lgfortran -lquadmath)
-    set(LAPACKE_DIR $ENV{LAPACK}/LAPACKE)
-    set(LINK_FLAGS "${LINK_FLAGS} ${LAPACK_LINKER_FLAGS}")
-    # LAPACKE is not used anymore. find_library(LAPACKE_LIB NAMES lapacke
-    # lapackelib liblapacke HINTS "/usr/lib/" )
-    set(LAPACK_LIBRARIES ${LAPACK_LIBRARIES} ${LAPACKE_LIB})
-    message(STATUS ${LAPACK_LIBRARIES})
-
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-      message(
-        "${CMAKE_CXX_COMPILER_ID} compiler detected adding -mkl flag for BLAS LAPACK"
-      )
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mkl")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mkl")
-    endif()
-
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+    message(
+      "${CMAKE_CXX_COMPILER_ID} compiler detected adding -mkl flag for BLAS LAPACK"
+    )
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mkl")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mkl")
   endif()
 
 endif()
@@ -196,7 +180,6 @@ if(BUILD_WITH_PETSC)
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake-modules")
   find_package(PETSc REQUIRED)
   add_definitions(-DBUILD_WITH_PETSC)
-
 endif()
 
 if(DIM_2)
@@ -219,7 +202,6 @@ endif()
 
 if(RUN_WEAK_SCALING)
   add_definitions(-DRUN_WEAK_SCALING)
-  # message('Configuring with Weak Scaling')
 endif()
 
 if(ALLTOALLV_FIX)
@@ -240,7 +222,7 @@ if(ENABLE_DENDRO_PROFILE_COUNTERS)
   add_definitions(-DENABLE_DENDRO_PROFILE_COUNTERS)
   add_definitions(-D__PROFILE_CTX__)
   add_definitions(-D__PROFILE_ETS__)
-  add_definitions(-D__PROFILE_ENUTS__)
+  # add_definitions(-D__PROFILE_ENUTS__)
 endif()
 
 if(RK_SOLVER_OVERLAP_COMM_AND_COMP)
@@ -255,7 +237,7 @@ endif()
 
 if(DENDRO_VTK_BINARY)
   add_definitions(-DDENDRO_VTU_BINARY)
-  if(DENDRO_VTK_ZLIB_COMPRES)
+if(DENDRO_VTK_ZLIB_COMPRES)
     add_definitions(-DDENDRO_VTU_ZLIB)
   endif()
 else()
@@ -266,19 +248,12 @@ if(USE_FD_INTERP_FOR_UNZIP)
   add_definitions(-DUSE_FD_INTERP_FOR_UNZIP)
 endif()
 
-# set(NUFFT_SRC ${CMAKE_CURRENT_SOURCE_DIR}/external/nufft3d-1.3.2/nufft3df90.f
-# ${CMAKE_CURRENT_SOURCE_DIR}/external/nufft3d-1.3.2/dirft3d.f
-# ${CMAKE_CURRENT_SOURCE_DIR}/external/nufft3d-1.3.2/dfftpack.f
-# ${CMAKE_CURRENT_SOURCE_DIR}/external/nufft3d-1.3.2/next235.f )
-
-# add_library(nufft3d_v1.3 STATIC ${NUFFT_SRC})
-
 add_definitions(-DMATVEC_PROFILE)
 
 # === END REQUIRED CONFIGURATIONS FOR DENDRO ===
 
 # now include the dendro repository for compiling the library
-add_subdirectory(dendro)
+add_subdirectory(dendrolib)
 
 # then the subdirectory for the actual source of the project
 add_subdirectory(solver)

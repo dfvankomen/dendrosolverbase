@@ -15,25 +15,25 @@
 #include <stdlib.h>
 
 namespace dsolve {
-SOLVERCtx::SOLVERCtx(ot::Mesh *pMesh) : Ctx() {
+SOLVERCtx::SOLVERCtx(ot::Mesh* pMesh) : Ctx() {
     m_uiMesh = pMesh;
-    // variable allocation for evolution variables
-    m_uiEVar = this->create_vec(ts::CTXVType::EVOLUTION, true, false, false,
-                                DENDROSOLVER_NUM_VARS);
 
-    // variable allocation for constraint variables.
-    m_uiCVar = this->create_vec(ts::CTXVType::CONSTRAINT, true, false, false,
-                                DENDROSOLVER_CONSTRAINT_NUM_VARS);
+    m_var[VL::CPU_EV].create_vector(m_uiMesh, ot::DVEC_TYPE::OCT_SHARED_NODES,
+                                    ot::DVEC_LOC::HOST, DENDROSOLVER_NUM_VARS,
+                                    true);
+    m_var[VL::CPU_EV_UZ_IN].create_vector(
+        m_uiMesh, ot::DVEC_TYPE::OCT_LOCAL_WITH_PADDING, ot::DVEC_LOC::HOST,
+        DENDROSOLVER_NUM_VARS, true);
+    m_var[VL::CPU_EV_UZ_OUT].create_vector(
+        m_uiMesh, ot::DVEC_TYPE::OCT_LOCAL_WITH_PADDING, ot::DVEC_LOC::HOST,
+        DENDROSOLVER_NUM_VARS, true);
 
-    // evars unzip in (0) evars unzip out (1)
-    m_uiEUnzip[0] = this->create_vec(ts::CTXVType::EVOLUTION, false, true,
-                                     false, DENDROSOLVER_NUM_VARS);
-    m_uiEUnzip[1] = this->create_vec(ts::CTXVType::EVOLUTION, false, true,
-                                     false, DENDROSOLVER_NUM_VARS);
-
-    // // constraint var unzip out (0)
-    m_uiCUnzip[0] = this->create_vec(ts::CTXVType::CONSTRAINT, false, true,
-                                     false, DENDROSOLVER_CONSTRAINT_NUM_VARS);
+    m_var[VL::CPU_CV].create_vector(m_uiMesh, ot::DVEC_TYPE::OCT_SHARED_NODES,
+                                    ot::DVEC_LOC::HOST,
+                                    DENDROSOLVER_CONSTRAINT_NUM_VARS, true);
+    m_var[VL::CPU_CV_UZ_IN].create_vector(
+        m_uiMesh, ot::DVEC_TYPE::OCT_LOCAL_WITH_PADDING, ot::DVEC_LOC::HOST,
+        DENDROSOLVER_CONSTRAINT_NUM_VARS, true);
 
     m_uiTinfo._m_uiStep = 0;
     m_uiTinfo._m_uiT = 0;
@@ -53,21 +53,20 @@ SOLVERCtx::SOLVERCtx(ot::Mesh *pMesh) : Ctx() {
     deallocate_deriv_workspace();
     allocate_deriv_workspace(m_uiMesh, 1);
 
-    // deallocate MPI ctx and allocate MPI ctx, this is in Milinda's code
-    // TODO:
+    ot::dealloc_mpi_ctx<DendroScalar>(
+        m_uiMesh, m_mpi_ctx, DENDROSOLVER_NUM_VARS, DENDROSOLVER_ASYNC_COMM_K);
+    ot::alloc_mpi_ctx<DendroScalar>(m_uiMesh, m_mpi_ctx, DENDROSOLVER_NUM_VARS,
+                                    DENDROSOLVER_ASYNC_COMM_K);
 
     return;
 }
 
 SOLVERCtx::~SOLVERCtx() {
-    this->destroy_vec(m_uiEVar);
-    this->destroy_vec(m_uiCVar);
-
-    this->destroy_vec(m_uiEUnzip[0]);
-    this->destroy_vec(m_uiEUnzip[1]);
-    this->destroy_vec(m_uiCUnzip[0]);
+    for (unsigned int i = 0; i < VL::END; i++) m_var[i].destroy_vector();
 
     deallocate_deriv_workspace();
+    ot::dealloc_mpi_ctx<DendroScalar>(
+        m_uiMesh, m_mpi_ctx, DENDROSOLVER_NUM_VARS, DENDROSOLVER_ASYNC_COMM_K);
 }
 
 int SOLVERCtx::initialize() {
@@ -90,10 +89,35 @@ int SOLVERCtx::initialize() {
     const unsigned int rank_global = m_uiMesh->getMPIRankGlobal();
     MPI_Comm gcomm = m_uiMesh->getMPIGlobalCommunicator();
 
+    DendroScalar* unzipVar[dsolve::DENDROSOLVER_NUM_VARS];
+    unsigned int refineVarIds[dsolve::DENDROSOLVER_NUM_REFINE_VARS];
+
+    for (unsigned int vIndex = 0; vIndex < dsolve::DENDROSOLVER_NUM_REFINE_VARS;
+         vIndex++)
+        refineVarIds[vIndex] =
+            dsolve::DENDROSOLVER_REFINE_VARIABLE_INDICES[vIndex];
+
+    double wTol = dsolve::DENDROSOLVER_WAVELET_TOL;
+    std::function<double(double, double, double, double* hx)> waveletTolFunc =
+        [](double x, double y, double z, double* hx) {
+            return dsolve::computeWTolDCoords(x, y, z, hx);
+        };
+
+    DVec& m_evar = m_var[VL::CPU_EV];
+    DVec& m_evar_unz = m_var[VL::CPU_EV_UZ_IN];
+
     do {
-        isRefine = this->is_remesh();
+        this->unzip(m_evar, m_evar_unz, dsolve::DENDROSOLVER_ASYNC_COMM_K);
+        m_evar_unz.to_2d(unzipVar);
+        // isRefine=this->is_remesh();
+        // enforce WMAR refinement based refinement initially.
+        // TODO: need to fix this for initial refinement!
+        isRefine = dsolve::isReMeshWAMR(
+            m_uiMesh, (const double**)unzipVar, refineVarIds,
+            dsolve::DENDROSOLVER_NUM_REFINE_VARS, waveletTolFunc,
+            dsolve::DENDROSOLVER_DENDRO_AMR_FAC);
         if (isRefine) {
-            ot::Mesh *newMesh =
+            ot::Mesh* newMesh =
                 this->remesh(dsolve::DENDROSOLVER_DENDRO_GRAIN_SZ,
                              dsolve::DENDROSOLVER_LOAD_IMB_TOL,
                              dsolve::DENDROSOLVER_SPLIT_FIX);
@@ -113,24 +137,29 @@ int SOLVERCtx::initialize() {
                                m_uiMesh->getMPIGlobalCommunicator());
 
             if (!rank_global) {
-                std::cout << "[dsolveCtx][initial grid convg. ] iter : "
-                          << iterCount << " (Remesh triggered) ->  old mesh : "
+                std::cout << "[dsolveCtx] iter : " << iterCount
+                          << " (Remesh triggered) ->  old mesh : "
                           << oldElements_g << " new mesh : " << newElements_g
                           << std::endl;
-
-                std::cout << "[dsolveCtx][initial grid convg. ] iter : "
-                          << iterCount
+                std::cout << "[dsolveCtx] iter : " << iterCount
                           << " (Remesh triggered) ->  old mesh (zip nodes) : "
                           << oldGridPoints_g
                           << " new mesh (zip nodes) : " << newGridPoints_g
                           << std::endl;
             }
 
-            this->grid_transfer(newMesh, true, false, false);
-            this->update_app_vars();
+            this->grid_transfer(newMesh);
 
             std::swap(m_uiMesh, newMesh);
             delete newMesh;
+
+#ifdef __CUDACC__
+            device::MeshGPU*& dptr_mesh = this->get_meshgpu_device_ptr();
+            device::MeshGPU* mesh_gpu = this->get_meshgpu_host_handle();
+
+            mesh_gpu->dealloc_mesh_on_device(dptr_mesh);
+            dptr_mesh = mesh_gpu->alloc_mesh_on_device(m_uiMesh);
+#endif
         }
 
         iterCount += 1;
@@ -142,7 +171,7 @@ int SOLVERCtx::initialize() {
 
     this->init_grid();
 
-    // with the grid now defined, we can allocate the workspace for derivatives
+    // // realloc dsolve deriv space
     deallocate_deriv_workspace();
     allocate_deriv_workspace(m_uiMesh, 1);
 
@@ -158,26 +187,22 @@ int SOLVERCtx::initialize() {
     m_uiTinfo._m_uiTh = dsolve::DENDROSOLVER_RK45_TIME_STEP_SIZE;
 
     if (!m_uiMesh->getMPIRankGlobal()) {
+        const DendroScalar dx_finest =
+            ((dsolve::DENDROSOLVER_COMPD_MAX[0] -
+              dsolve::DENDROSOLVER_COMPD_MIN[0]) *
+             ((1u << (m_uiMaxDepth - lmax)) /
+              ((double)dsolve::DENDROSOLVER_ELE_ORDER)) /
+             ((double)(1u << (m_uiMaxDepth))));
+        const DendroScalar dt_finest =
+            dsolve::DENDROSOLVER_CFL_FACTOR * dx_finest;
+
         std::cout << "================= Grid Info (After init grid "
                      "converge):==============================================="
                      "========"
                   << std::endl;
         std::cout << "lmin: " << lmin << " lmax:" << lmax << std::endl;
-        std::cout << "dx: "
-                  << ((dsolve::DENDROSOLVER_COMPD_MAX[0] -
-                       dsolve::DENDROSOLVER_COMPD_MIN[0]) *
-                      ((1u << (m_uiMaxDepth - lmax)) /
-                       ((double)dsolve::DENDROSOLVER_ELE_ORDER)) /
-                      ((double)(1u << (m_uiMaxDepth))))
-                  << std::endl;
-        std::cout << "dt: "
-                  << dsolve::DENDROSOLVER_CFL_FACTOR *
-                         ((dsolve::DENDROSOLVER_COMPD_MAX[0] -
-                           dsolve::DENDROSOLVER_COMPD_MIN[0]) *
-                          ((1u << (m_uiMaxDepth - lmax)) /
-                           ((double)dsolve::DENDROSOLVER_ELE_ORDER)) /
-                          ((double)(1u << (m_uiMaxDepth))))
-                  << std::endl;
+        std::cout << "dx: " << dx_finest << std::endl;
+        std::cout << "dt: " << dt_finest << std::endl;
         std::cout << "========================================================="
                      "======================================================"
                   << std::endl;
@@ -187,91 +212,73 @@ int SOLVERCtx::initialize() {
 }
 
 int SOLVERCtx::init_grid() {
-    unsigned int nodeLookUp_CG;
-    unsigned int nodeLookUp_DG;
-    DendroScalar x, y, z, len;
-    const ot::TreeNode *pNodes = &(*(m_uiMesh->getAllElements().begin()));
-    unsigned int ownerID, ii_x, jj_y, kk_z;
-    unsigned int eleOrder = m_uiMesh->getElementOrder();
-    const unsigned int *e2n_cg = &(*(m_uiMesh->getE2NMapping().begin()));
-    const unsigned int *e2n_dg = &(*(m_uiMesh->getE2NMapping_DG().begin()));
+    DVec& m_evar = m_var[VL::CPU_EV];
+    DVec& m_dptr_evar = m_var[VL::GPU_EV];
+
+    const ot::TreeNode* pNodes = &(*(m_uiMesh->getAllElements().begin()));
+    const unsigned int eleOrder = m_uiMesh->getElementOrder();
+    const unsigned int* e2n_cg = &(*(m_uiMesh->getE2NMapping().begin()));
+    const unsigned int* e2n_dg = &(*(m_uiMesh->getE2NMapping_DG().begin()));
     const unsigned int nPe = m_uiMesh->getNumNodesPerElement();
     const unsigned int nodeLocalBegin = m_uiMesh->getNodeLocalBegin();
     const unsigned int nodeLocalEnd = m_uiMesh->getNodeLocalEnd();
 
-    DendroScalar *var = new double[dsolve::DENDROSOLVER_NUM_VARS];
-    DendroScalar **zipIn = new DendroScalar *[dsolve::DENDROSOLVER_NUM_VARS];
-    m_uiEVar.Get2DArray(zipIn, true);
+    DendroScalar* zipIn[dsolve::DENDROSOLVER_NUM_VARS];
+    m_evar.to_2d(zipIn);
+
+    DendroScalar var1[dsolve::DENDROSOLVER_NUM_VARS];
 
     DendroScalar mp, mm, mp_adm, mm_adm, E, J1, J2, J3;
     // set the TP communicator.
     if (dsolve::DENDROSOLVER_ID_TYPE == 0) {
-        // TODO: remove this call, this should *not* exit, yet it will
-        std::cout << "WARNING: TWO PUNCTURE CODE CALLED, THIS IS UNSUPPORTED "
-                     "IN THE SOLVER FOR NOW, WILL NEED CUSTOM HANDLING"
-                  << std::endl;
-        exit(EXIT_FAILURE);
         TP_MPI_COMM = m_uiMesh->getMPIGlobalCommunicator();
-        TwoPunctures((double)0, (double)0, (double)0, var, &mp, &mm, &mp_adm,
+        TwoPunctures((double)0, (double)0, (double)0, var1, &mp, &mm, &mp_adm,
                      &mm_adm, &E, &J1, &J2, &J3);
     }
 
     for (unsigned int elem = m_uiMesh->getElementLocalBegin();
          elem < m_uiMesh->getElementLocalEnd(); elem++) {
+        DendroScalar var[dsolve::DENDROSOLVER_NUM_VARS];
         for (unsigned int k = 0; k < (eleOrder + 1); k++)
             for (unsigned int j = 0; j < (eleOrder + 1); j++)
                 for (unsigned int i = 0; i < (eleOrder + 1); i++) {
-                    nodeLookUp_CG = e2n_cg[elem * nPe +
-                                           k * (eleOrder + 1) * (eleOrder + 1) +
-                                           j * (eleOrder + 1) + i];
+                    const unsigned int nodeLookUp_CG =
+                        e2n_cg[elem * nPe +
+                               k * (eleOrder + 1) * (eleOrder + 1) +
+                               j * (eleOrder + 1) + i];
                     if (nodeLookUp_CG >= nodeLocalBegin &&
                         nodeLookUp_CG < nodeLocalEnd) {
-                        nodeLookUp_DG =
+                        const unsigned int nodeLookUp_DG =
                             e2n_dg[elem * nPe +
                                    k * (eleOrder + 1) * (eleOrder + 1) +
                                    j * (eleOrder + 1) + i];
+                        unsigned int ownerID, ii_x, jj_y, kk_z;
                         m_uiMesh->dg2eijk(nodeLookUp_DG, ownerID, ii_x, jj_y,
                                           kk_z);
-                        len = (double)(1u << (m_uiMaxDepth -
-                                              pNodes[ownerID].getLevel()));
-                        x = pNodes[ownerID].getX() + ii_x * (len / (eleOrder));
-                        y = pNodes[ownerID].getY() + jj_y * (len / (eleOrder));
-                        z = pNodes[ownerID].getZ() + kk_z * (len / (eleOrder));
+                        const DendroScalar len =
+                            (double)(1u << (m_uiMaxDepth -
+                                            pNodes[ownerID].getLevel()));
+
+                        const DendroScalar x =
+                            pNodes[ownerID].getX() + ii_x * (len / (eleOrder));
+                        const DendroScalar y =
+                            pNodes[ownerID].getY() + jj_y * (len / (eleOrder));
+                        const DendroScalar z =
+                            pNodes[ownerID].getZ() + kk_z * (len / (eleOrder));
 
                         if (dsolve::DENDROSOLVER_ID_TYPE == 0) {
-                            // NOTE: this is not yet ready!
-                            // TODO: remove this comment when it is ready and
-                            // running
+                            const DendroScalar xx = GRIDX_TO_X(x);
+                            const DendroScalar yy = GRIDY_TO_Y(y);
+                            const DendroScalar zz = GRIDZ_TO_Z(z);
 
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
-                            TwoPunctures((double)x, (double)y, (double)z, var,
-                                         &mp, &mm, &mp_adm, &mm_adm, &E, &J1,
-                                         &J2, &J3);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 1) {
-                            // TODO: REMOVE THIS COMMENT WHEN IT'S READY
-                            dsolve::punctureData((double)x, (double)y,
-                                                 (double)z, var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 2) {
-                            // NOTE: THIS INITIALLY WAS KerrSchildData, but
-                            // we're doing different ones now everything below
-                            // this line is now custom functions
-
-                            // DO SUPERPOSED BOOSTED KERR SEN INIT
-                            x = GRIDX_TO_X(x);
-                            y = GRIDY_TO_Y(y);
-                            z = GRIDZ_TO_Z(z);
-                            dsolve::minkowskiInit((double)x, (double)y,
-                                                  (double)z, var);
-                        } else if (dsolve::DENDROSOLVER_ID_TYPE == 3) {
-                            dsolve::noiseData((double)GRIDX_TO_X(x),
-                                              (double)GRIDY_TO_Y(y),
-                                              (double)GRIDZ_TO_Z(z), var);
+                            TwoPunctures((double)xx, (double)yy, (double)zz,
+                                         var, &mp, &mm, &mp_adm, &mm_adm, &E,
+                                         &J1, &J2, &J3);
                         } else {
-                            std::cout << "Unknown ID type: "
-                                      << dsolve::DENDROSOLVER_ID_TYPE
-                                      << std::endl;
+                            // all other values are handled in the initial data
+                            // wrapper including an error message
+                            initialDataFunctionWrapper((double)x, (double)y,
+                                                       (double)z, var);
                         }
                         for (unsigned int v = 0;
                              v < dsolve::DENDROSOLVER_NUM_VARS; v++)
@@ -282,10 +289,7 @@ int SOLVERCtx::init_grid() {
 
     for (unsigned int node = m_uiMesh->getNodeLocalBegin();
          node < m_uiMesh->getNodeLocalEnd(); node++)
-        enforce_solver_constraints(zipIn, node);
-
-    delete[] var;
-    delete[] zipIn;
+        enforce_dsolve_constraints(zipIn, node);
 
 #ifdef DENDROSOLVER_EXTRACT_BH_LOCATIONS
     m_uiBHLoc[0] = Point(dsolve::BH1.getBHCoordX(), dsolve::BH1.getBHCoordY(),
@@ -299,339 +303,63 @@ int SOLVERCtx::init_grid() {
 
 int SOLVERCtx::finalize() { return 0; }
 
-int SOLVERCtx::rhs(DVec *in, DVec *out, unsigned int sz, DendroScalar time) {
+int SOLVERCtx::rhs(DVec* in, DVec* out, unsigned int sz, DendroScalar time) {
     // all the variables should be packed together.
-    assert(sz == 1);
-    DendroScalar **sVar;
-    in[0].Get2DArray(sVar, false);
+    // assert(sz==1);
+    // DendroScalar * sVar[DENDROSOLVER_NUM_VARS];
+    // in->to_2d(sVar);
 
-    for (unsigned int node = m_uiMesh->getNodeLocalBegin();
-         node < m_uiMesh->getNodeLocalEnd(); node++)
-        enforce_solver_constraints(sVar, node);
+    this->unzip(*in, m_var[VL::CPU_EV_UZ_IN],
+                dsolve::DENDROSOLVER_ASYNC_COMM_K);
 
-    delete[] sVar;
+#ifdef __PROFILE_CTX__
+    this->m_uiCtxpt[ts::CTXPROFILE::RHS].start();
+#endif
 
-    this->unzip(in[0], m_uiEUnzip[0], dsolve::DENDROSOLVER_ASYNC_COMM_K);
+    DendroScalar* unzipIn[DENDROSOLVER_NUM_VARS];
+    DendroScalar* unzipOut[DENDROSOLVER_NUM_VARS];
 
-    DendroScalar **unzipIn;
-    DendroScalar **unzipOut;
+    m_var[CPU_EV_UZ_IN].to_2d(unzipIn);
+    m_var[CPU_EV_UZ_OUT].to_2d(unzipOut);
 
-    m_uiEUnzip[0].Get2DArray(unzipIn, false);
-    m_uiEUnzip[1].Get2DArray(unzipOut, false);
-
-    const ot::Block *blkList = m_uiMesh->getLocalBlockList().data();
+    const ot::Block* blkList = m_uiMesh->getLocalBlockList().data();
     const unsigned int numBlocks = m_uiMesh->getLocalBlockList().size();
 
-    dendroSolverRHS(unzipOut, (const DendroScalar **)unzipIn, blkList,
+    dendroSolverRHS(unzipOut, (const DendroScalar**)unzipIn, blkList,
                     numBlocks);
 
-    this->zip(m_uiEUnzip[1], out[0], dsolve::DENDROSOLVER_ASYNC_COMM_K);
-
-    delete[] unzipIn;
-    delete[] unzipOut;
-
-    return 0;
-}
-
-int SOLVERCtx::rhs_blkwise(DVec in, DVec out, const unsigned int *const blkIDs,
-                           unsigned int numIds, DendroScalar *blk_time) const {
-    DendroScalar **unzipIn;
-    DendroScalar **unzipOut;
-
-    assert(in.GetDof() == out.GetDof());
-    assert(in.IsUnzip() == out.IsUnzip());
-
-    in.Get2DArray(unzipIn, false);
-    out.Get2DArray(unzipOut, false);
-
-    const ot::Block *blkList = m_uiMesh->getLocalBlockList().data();
-    const unsigned int numBlocks = m_uiMesh->getLocalBlockList().size();
-
-    unsigned int offset;
-    double ptmin[3], ptmax[3];
-    unsigned int sz[3];
-    unsigned int bflag;
-    double dx, dy, dz;
-    const Point pt_min(dsolve::DENDROSOLVER_COMPD_MIN[0],
-                       dsolve::DENDROSOLVER_COMPD_MIN[1],
-                       dsolve::DENDROSOLVER_COMPD_MIN[2]);
-    const Point pt_max(dsolve::DENDROSOLVER_COMPD_MAX[0],
-                       dsolve::DENDROSOLVER_COMPD_MAX[1],
-                       dsolve::DENDROSOLVER_COMPD_MAX[2]);
-    const unsigned int PW = dsolve::DENDROSOLVER_PADDING_WIDTH;
-
-    for (unsigned int i = 0; i < numIds; i++) {
-        const unsigned int blk = blkIDs[i];
-        assert(blk < numBlocks);
-
-        offset = blkList[blk].getOffset();
-        sz[0] = blkList[blk].getAllocationSzX();
-        sz[1] = blkList[blk].getAllocationSzY();
-        sz[2] = blkList[blk].getAllocationSzZ();
-
-        bflag = blkList[blk].getBlkNodeFlag();
-
-        dx = blkList[blk].computeDx(pt_min, pt_max);
-        dy = blkList[blk].computeDy(pt_min, pt_max);
-        dz = blkList[blk].computeDz(pt_min, pt_max);
-
-        ptmin[0] = GRIDX_TO_X(blkList[blk].getBlockNode().minX()) - PW * dx;
-        ptmin[1] = GRIDY_TO_Y(blkList[blk].getBlockNode().minY()) - PW * dy;
-        ptmin[2] = GRIDZ_TO_Z(blkList[blk].getBlockNode().minZ()) - PW * dz;
-
-        ptmax[0] = GRIDX_TO_X(blkList[blk].getBlockNode().maxX()) + PW * dx;
-        ptmax[1] = GRIDY_TO_Y(blkList[blk].getBlockNode().maxY()) + PW * dy;
-        ptmax[2] = GRIDZ_TO_Z(blkList[blk].getBlockNode().maxZ()) + PW * dz;
-
-#ifdef DENDROSOLVER_RHS_STAGED_COMP
-        dendroSolverRHSUnpacked_sep(unzipOut, (const double **)unzipIn, offset,
-                                    ptmin, ptmax, sz, bflag);
-#else
-        dendroSolverRHSUnpacked(unzipOut, (const double **)unzipIn, offset,
-                                ptmin, ptmax, sz, bflag);
-#endif
-    }
-
-    delete[] unzipIn;
-    delete[] unzipOut;
-
-    return 0;
-}
-
-int SOLVERCtx::rhs_blk(const DendroScalar *in, DendroScalar *out,
-                       unsigned int dof, unsigned int local_blk_id,
-                       DendroScalar blk_time) const {
-    // return 0;
-    // std::cout<<"solver_rhs"<<std::endl;
-    DendroScalar **unzipIn = new DendroScalar *[dof];
-    DendroScalar **unzipOut = new DendroScalar *[dof];
-
-    const unsigned int blk = local_blk_id;
-
-    const ot::Block *blkList = m_uiMesh->getLocalBlockList().data();
-    const unsigned int numBlocks = m_uiMesh->getLocalBlockList().size();
-    double ptmin[3], ptmax[3];
-    unsigned int sz[3];
-    unsigned int bflag;
-    double dx, dy, dz;
-    const Point pt_min(dsolve::DENDROSOLVER_COMPD_MIN[0],
-                       dsolve::DENDROSOLVER_COMPD_MIN[1],
-                       dsolve::DENDROSOLVER_COMPD_MIN[2]);
-    const Point pt_max(dsolve::DENDROSOLVER_COMPD_MAX[0],
-                       dsolve::DENDROSOLVER_COMPD_MAX[1],
-                       dsolve::DENDROSOLVER_COMPD_MAX[2]);
-    const unsigned int PW = dsolve::DENDROSOLVER_PADDING_WIDTH;
-
-    sz[0] = blkList[blk].getAllocationSzX();
-    sz[1] = blkList[blk].getAllocationSzY();
-    sz[2] = blkList[blk].getAllocationSzZ();
-
-    const unsigned int NN = sz[0] * sz[1] * sz[2];
-
-    for (unsigned int v = 0; v < dof; v++) {
-        unzipIn[v] = (DendroScalar *)(in + v * NN);
-        unzipOut[v] = (DendroScalar *)(out + v * NN);
-    }
-
-    bflag = blkList[blk].getBlkNodeFlag();
-    const unsigned int pw = blkList[blk].get1DPadWidth();
-
-    // if(!bflag)
-    // {
-    //     // for(unsigned int node=0; node < NN; node++)
-    //     //     enforce_solver_constraints(unzipIn, node);
-    //     for(unsigned int k=pw; k < sz[2]-pw; k++)
-    //     for(unsigned int j=pw; j < sz[1]-pw; j++)
-    //     for(unsigned int i=pw; i < sz[0]-pw; i++)
-    //     {
-    //         const unsigned nid = k*sz[1]*sz[0] + j*sz[0] + i;
-    //         enforce_solver_constraints(unzipIn,nid);
-    //     }
-
-    // }else
-    // {
-    //     // note that we can apply enforce dsolve constraints in the right
-    //     padd, at the left boundary block,
-    //     // currently we only apply internal parts of the boundary blocks.
-    //     for(unsigned int k=pw; k < sz[2]-pw; k++)
-    //     for(unsigned int j=pw; j < sz[1]-pw; j++)
-    //     for(unsigned int i=pw; i < sz[0]-pw; i++)
-    //     {
-    //         const unsigned nid = k*sz[1]*sz[0] + j*sz[0] + i;
-    //         enforce_solver_constraints(unzipIn,nid);
-    //     }
-
-    // }
-
-    dx = blkList[blk].computeDx(pt_min, pt_max);
-    dy = blkList[blk].computeDy(pt_min, pt_max);
-    dz = blkList[blk].computeDz(pt_min, pt_max);
-
-    ptmin[0] = GRIDX_TO_X(blkList[blk].getBlockNode().minX()) - PW * dx;
-    ptmin[1] = GRIDY_TO_Y(blkList[blk].getBlockNode().minY()) - PW * dy;
-    ptmin[2] = GRIDZ_TO_Z(blkList[blk].getBlockNode().minZ()) - PW * dz;
-
-    ptmax[0] = GRIDX_TO_X(blkList[blk].getBlockNode().maxX()) + PW * dx;
-    ptmax[1] = GRIDY_TO_Y(blkList[blk].getBlockNode().maxY()) + PW * dy;
-    ptmax[2] = GRIDZ_TO_Z(blkList[blk].getBlockNode().maxZ()) + PW * dz;
-
-#ifdef DENDROSOLVER_RHS_STAGED_COMP
-    dendroSolverRHSUnpacked_sep(unzipOut, (const DendroScalar **)unzipIn, 0,
-                                ptmin, ptmax, sz, bflag);
-#else
-    dendroSolverRHSUnpacked(unzipOut, (const DendroScalar **)unzipIn, 0, ptmin,
-                            ptmax, sz, bflag);
+#ifdef __PROFILE_CTX__
+    this->m_uiCtxpt[ts::CTXPROFILE::RHS].stop();
 #endif
 
-    delete[] unzipIn;
-    delete[] unzipOut;
+    this->zip(m_var[CPU_EV_UZ_OUT], *out);
 
-    return 0;
-}
-
-int SOLVERCtx::pre_stage_blk(DendroScalar *in, unsigned int dof,
-                             unsigned int local_blk_id,
-                             DendroScalar blk_time) const {
-    DendroScalar **unzipIn = new DendroScalar *[dof];
-    const unsigned int blk = local_blk_id;
-
-    const ot::Block *blkList = m_uiMesh->getLocalBlockList().data();
-    const unsigned int numBlocks = m_uiMesh->getLocalBlockList().size();
-    double ptmin[3], ptmax[3];
-    unsigned int sz[3];
-    unsigned int bflag;
-    double dx, dy, dz;
-    const Point pt_min(dsolve::DENDROSOLVER_COMPD_MIN[0],
-                       dsolve::DENDROSOLVER_COMPD_MIN[1],
-                       dsolve::DENDROSOLVER_COMPD_MIN[2]);
-    const Point pt_max(dsolve::DENDROSOLVER_COMPD_MAX[0],
-                       dsolve::DENDROSOLVER_COMPD_MAX[1],
-                       dsolve::DENDROSOLVER_COMPD_MAX[2]);
-
-    sz[0] = blkList[blk].getAllocationSzX();
-    sz[1] = blkList[blk].getAllocationSzY();
-    sz[2] = blkList[blk].getAllocationSzZ();
-
-    const unsigned int NN = sz[0] * sz[1] * sz[2];
-
-    for (unsigned int v = 0; v < dof; v++) {
-        unzipIn[v] = (DendroScalar *)(in + v * NN);
-    }
-
-    bflag = blkList[blk].getBlkNodeFlag();
-    const unsigned int pw = blkList[blk].get1DPadWidth();
-
-    if (!bflag) {
-        for (unsigned int node = 0; node < NN; node++)
-            enforce_solver_constraints(unzipIn, node);
-        // for(unsigned int k=pw; k < sz[2]-pw; k++)
-        // for(unsigned int j=pw; j < sz[1]-pw; j++)
-        // for(unsigned int i=pw; i < sz[0]-pw; i++)
-        // {
-        //     const unsigned nid = k*sz[1]*sz[0] + j*sz[0] + i;
-        //     enforce_solver_constraints(unzipIn,nid);
-        // }
-    } else {
-        // note that we can apply enforce dsolve constraints in the right padd,
-        // at the left boundary block, currently we only apply internal parts of
-        // the boundary blocks.
-        for (unsigned int k = pw; k < sz[2] - pw; k++)
-            for (unsigned int j = pw; j < sz[1] - pw; j++)
-                for (unsigned int i = pw; i < sz[0] - pw; i++) {
-                    const unsigned nid = k * sz[1] * sz[0] + j * sz[0] + i;
-                    enforce_solver_constraints(unzipIn, nid);
-                }
-    }
-
-    delete[] unzipIn;
-    return 0;
-}
-
-int SOLVERCtx::post_stage_blk(DendroScalar *in, unsigned int dof,
-                              unsigned int local_blk_id,
-                              DendroScalar blk_time) const {
-    return 0;
-}
-
-int SOLVERCtx::pre_timestep_blk(DendroScalar *in, unsigned int dof,
-                                unsigned int local_blk_id,
-                                DendroScalar blk_time) const {
-    return 0;
-}
-
-int SOLVERCtx::post_timestep_blk(DendroScalar *in, unsigned int dof,
-                                 unsigned int local_blk_id,
-                                 DendroScalar blk_time) const {
-    DendroScalar **unzipIn = new DendroScalar *[dof];
-    const unsigned int blk = local_blk_id;
-
-    const ot::Block *blkList = m_uiMesh->getLocalBlockList().data();
-    const unsigned int numBlocks = m_uiMesh->getLocalBlockList().size();
-    double ptmin[3], ptmax[3];
-    unsigned int sz[3];
-    unsigned int bflag;
-    double dx, dy, dz;
-    const Point pt_min(dsolve::DENDROSOLVER_COMPD_MIN[0],
-                       dsolve::DENDROSOLVER_COMPD_MIN[1],
-                       dsolve::DENDROSOLVER_COMPD_MIN[2]);
-    const Point pt_max(dsolve::DENDROSOLVER_COMPD_MAX[0],
-                       dsolve::DENDROSOLVER_COMPD_MAX[1],
-                       dsolve::DENDROSOLVER_COMPD_MAX[2]);
-
-    sz[0] = blkList[blk].getAllocationSzX();
-    sz[1] = blkList[blk].getAllocationSzY();
-    sz[2] = blkList[blk].getAllocationSzZ();
-
-    const unsigned int NN = sz[0] * sz[1] * sz[2];
-
-    for (unsigned int v = 0; v < dof; v++) {
-        unzipIn[v] = (DendroScalar *)(in + v * NN);
-    }
-
-    bflag = blkList[blk].getBlkNodeFlag();
-    const unsigned int pw = blkList[blk].get1DPadWidth();
-
-    if (!bflag) {
-        for (unsigned int node = 0; node < NN; node++)
-            enforce_solver_constraints(unzipIn, node);
-        // for(unsigned int k=pw; k < sz[2]-pw; k++)
-        // for(unsigned int j=pw; j < sz[1]-pw; j++)
-        // for(unsigned int i=pw; i < sz[0]-pw; i++)
-        // {
-        //     const unsigned nid = k*sz[1]*sz[0] + j*sz[0] + i;
-        //     enforce_solver_constraints(unzipIn,nid);
-        // }
-    } else {
-        // note that we can apply enforce dsolve constraints in the right padd,
-        // at the left boundary block, currently we only apply internal parts of
-        // the boundary blocks.
-        for (unsigned int k = pw; k < sz[2] - pw; k++)
-            for (unsigned int j = pw; j < sz[1] - pw; j++)
-                for (unsigned int i = pw; i < sz[0] - pw; i++) {
-                    const unsigned nid = k * sz[1] * sz[0] + j * sz[0] + i;
-                    enforce_solver_constraints(unzipIn, nid);
-                }
-    }
-
-    delete[] unzipIn;
     return 0;
 }
 
 int SOLVERCtx::write_vtu() {
-    unzip(m_uiEVar, m_uiEUnzip[0], DENDROSOLVER_ASYNC_COMM_K);
+    if (!m_uiMesh->isActive()) return 0;
 
-    DendroScalar **evolUnzipVar = NULL;
-    DendroScalar **consUnzipVar = NULL;
-    DendroScalar **consVar = NULL;
-    DendroScalar **evolVar = NULL;
+    DVec& m_evar = m_var[VL::CPU_EV];
+    DVec& m_evar_unz = m_var[VL::CPU_EV_UZ_IN];
+    DVec& m_cvar = m_var[VL::CPU_CV];
+    DVec& m_cvar_unz = m_var[VL::CPU_CV_UZ_IN];
 
-    m_uiEUnzip[0].Get2DArray(evolUnzipVar, false);
-    m_uiCUnzip[0].Get2DArray(consUnzipVar, false);
+    this->unzip(m_evar, m_evar_unz, DENDROSOLVER_ASYNC_COMM_K);
 
-    m_uiEVar.Get2DArray(evolVar, false);
-    m_uiCVar.Get2DArray(consVar, false);
+    DendroScalar* consUnzipVar[dsolve::DENDROSOLVER_CONSTRAINT_NUM_VARS];
+    DendroScalar* consVar[dsolve::DENDROSOLVER_CONSTRAINT_NUM_VARS];
 
-#ifdef DENDROSOLVER_COMPUTE_CONSTRAINTS
+    DendroScalar* evolUnzipVar[dsolve::DENDROSOLVER_NUM_VARS];
+    DendroScalar* evolVar[dsolve::DENDROSOLVER_NUM_VARS];
+
+    m_evar_unz.to_2d(evolUnzipVar);
+    m_cvar_unz.to_2d(consUnzipVar);
+
+    m_evar.to_2d(evolVar);
+    m_cvar.to_2d(consVar);
+
+#if DENDROSOLVER_COMPUTE_CONSTRAINTS
 
     const std::vector<ot::Block> blkList = m_uiMesh->getLocalBlockList();
 
@@ -668,23 +396,24 @@ int SOLVERCtx::write_vtu() {
         ptmax[1] = GRIDY_TO_Y(blkList[blk].getBlockNode().maxY()) + PW * dy;
         ptmax[2] = GRIDZ_TO_Z(blkList[blk].getBlockNode().maxZ()) + PW * dz;
 
-        physical_constraints(consUnzipVar, (const DendroScalar **)evolUnzipVar,
+        physical_constraints(consUnzipVar, (const DendroScalar**)evolUnzipVar,
                              offset, ptmin, ptmax, sz, bflag);
     }
 
     /*double consVecMin[dsolve::DENDROSOLVER_CONSTRAINT_NUM_VARS];
-        double consVecMax[dsolve::DENDROSOLVER_CONSTRAINT_NUM_VARS];*/
+    double consVecMax[dsolve::DENDROSOLVER_CONSTRAINT_NUM_VARS];*/
     double constraintMaskedL2[dsolve::DENDROSOLVER_CONSTRAINT_NUM_VARS];
+    this->zip(m_cvar_unz, m_cvar);
+    m_uiMesh->readFromGhostBegin(m_cvar.get_vec_ptr(), m_cvar.get_dof());
+    m_uiMesh->readFromGhostEnd(m_cvar.get_vec_ptr(), m_cvar.get_dof());
 
-    this->zip(m_uiCUnzip[0], m_uiCVar, dsolve::DENDROSOLVER_ASYNC_COMM_K);
-
-    dsolve::extractConstraints(m_uiMesh, (const DendroScalar **)consVar,
+    dsolve::extractConstraints(m_uiMesh, (const DendroScalar**)consVar,
                                evolVar[BHLOC::EXTRACTION_VAR_ID],
                                BHLOC::EXTRACTION_TOL, m_uiTinfo._m_uiStep,
                                m_uiTinfo._m_uiT);
 #ifndef DENDROSOLVER_KERR_SCHILD_TEST
 #ifdef DENDROSOLVER_EXTRACT_GRAVITATIONAL_WAVES
-    GW::extractFarFieldPsi4(m_uiMesh, (const DendroScalar **)consVar,
+    GW::extractFarFieldPsi4(m_uiMesh, (const DendroScalar**)consVar,
                             m_uiTinfo._m_uiStep, m_uiTinfo._m_uiT);
 #endif
 #endif
@@ -700,7 +429,7 @@ int SOLVERCtx::write_vtu() {
         const unsigned int numEvolVars =
             dsolve::DENDROSOLVER_NUM_EVOL_VARS_VTU_OUTPUT;
 
-        double *pData[(numConstVars + numEvolVars)];
+        double* pData[(numConstVars + numEvolVars)];
 
         for (unsigned int i = 0; i < numEvolVars; i++) {
             pDataNames.push_back(
@@ -711,20 +440,19 @@ int SOLVERCtx::write_vtu() {
 
         for (unsigned int i = 0; i < numConstVars; i++) {
             pDataNames.push_back(
-                std::string(dsolve::DENDROSOLVER_VAR_CONSTRAINT_NAMES
+                std::string(dsolve::DENDROSOLVER_CONSTRAINT_VAR_NAMES
                                 [DENDROSOLVER_VTU_OUTPUT_CONST_INDICES[i]]));
             pData[numEvolVars + i] =
                 consVar[DENDROSOLVER_VTU_OUTPUT_CONST_INDICES[i]];
         }
 
-        std::vector<char *> pDataNames_char;
+        std::vector<char*> pDataNames_char;
         pDataNames_char.reserve(pDataNames.size());
 
         for (unsigned int i = 0; i < pDataNames.size(); i++)
-            pDataNames_char.push_back(
-                const_cast<char *>(pDataNames[i].c_str()));
+            pDataNames_char.push_back(const_cast<char*>(pDataNames[i].c_str()));
 
-        const char *fDataNames[] = {"Time", "Cycle"};
+        const char* fDataNames[] = {"Time", "Cycle"};
         const double fData[] = {m_uiTinfo._m_uiT, (double)m_uiTinfo._m_uiStep};
 
         char fPrefix[256];
@@ -738,119 +466,107 @@ int SOLVERCtx::write_vtu() {
             unsigned int s_norm[3] = {0, 0, 1};
             io::vtk::mesh2vtu_slice(
                 m_uiMesh, s_val, s_norm, fPrefix, 2, fDataNames, fData,
-                (numEvolVars + numConstVars),
-                (const char **)&pDataNames_char[0], (const double **)pData);
+                (numEvolVars + numConstVars), (const char**)&pDataNames_char[0],
+                (const double**)pData);
         } else
             io::vtk::mesh2vtuFine(m_uiMesh, fPrefix, 2, fDataNames, fData,
                                   (numEvolVars + numConstVars),
-                                  (const char **)&pDataNames_char[0],
-                                  (const double **)pData);
+                                  (const char**)&pDataNames_char[0],
+                                  (const double**)pData);
     }
 
 #endif
 
 #ifdef DENDROSOLVER_EXTRACT_BH_LOCATIONS
-    dsolve::writeBHCoordinates((const ot::Mesh *)m_uiMesh,
-                               (const Point *)m_uiBHLoc, 2, m_uiTinfo._m_uiStep,
+    dsolve::writeBHCoordinates((const ot::Mesh*)m_uiMesh,
+                               (const Point*)m_uiBHLoc, 2, m_uiTinfo._m_uiStep,
                                m_uiTinfo._m_uiT);
 #endif
-
-    delete[] evolUnzipVar;
-    delete[] consUnzipVar;
-    delete[] evolVar;
-    delete[] consVar;
 
     return 0;
 }
 
 int SOLVERCtx::write_checkpt() {
-    if (m_uiMesh->isActive()) {
-        unsigned int cpIndex;
-        (m_uiTinfo._m_uiStep % (2 * dsolve::DENDROSOLVER_CHECKPT_FREQ) == 0)
-            ? cpIndex = 0
-            : cpIndex = 1;  // to support alternate file writing.
+    if (!m_uiMesh->isActive()) return 0;
 
-        const bool is_merged =
-            ((dsolve::DENDROSOLVER_BH_LOC[0] - dsolve::DENDROSOLVER_BH_LOC[1])
-                 .abs() < 0.1);
-        if (is_merged && !dsolve::DENDROSOLVER_MERGED_CHKPT_WRITTEN) {
-            cpIndex = 3;
-            dsolve::DENDROSOLVER_MERGED_CHKPT_WRITTEN = true;
-        }
+    unsigned int cpIndex;
+    (m_uiTinfo._m_uiStep % (2 * dsolve::DENDROSOLVER_CHECKPT_FREQ) == 0)
+        ? cpIndex = 0
+        : cpIndex = 1;  // to support alternate file writing.
 
-        unsigned int rank = m_uiMesh->getMPIRank();
-        unsigned int npes = m_uiMesh->getMPICommSize();
-
-        DendroScalar **eVar = NULL;
-        m_uiEVar.Get2DArray(eVar, false);
-
-        char fName[256];
-        const ot::TreeNode *pNodes = &(*(m_uiMesh->getAllElements().begin() +
-                                         m_uiMesh->getElementLocalBegin()));
-        sprintf(fName, "%s_octree_%d_%d.oct",
-                dsolve::DENDROSOLVER_CHKPT_FILE_PREFIX.c_str(), cpIndex, rank);
-        io::checkpoint::writeOctToFile(fName, pNodes,
-                                       m_uiMesh->getNumLocalMeshElements());
-
-        unsigned int numVars = dsolve::DENDROSOLVER_NUM_VARS;
-        const char **varNames = dsolve::DENDROSOLVER_VAR_NAMES;
-
-        /*for(unsigned int i=0;i<numVars;i++)
-        {
-            sprintf(fName,"%s_%s_%d_%d.var",fNamePrefix,varNames[i],cpIndex,rank);
-            io::checkpoint::writeVecToFile(fName,m_uiMesh,m_uiPrevVar[i]);
-        }*/
-
-        sprintf(fName, "%s_%d_%d.var",
-                dsolve::DENDROSOLVER_CHKPT_FILE_PREFIX.c_str(), cpIndex, rank);
-        io::checkpoint::writeVecToFile(fName, m_uiMesh, (const double **)eVar,
-                                       dsolve::DENDROSOLVER_NUM_VARS);
-
-        if (!rank) {
-            sprintf(fName, "%s_step_%d.cp",
-                    dsolve::DENDROSOLVER_CHKPT_FILE_PREFIX.c_str(), cpIndex);
-            std::cout << "[SOLVERCtx] \t writing checkpoint file : " << fName
-                      << std::endl;
-            std::ofstream outfile(fName);
-            if (!outfile) {
-                std::cout << fName << " file open failed " << std::endl;
-                return 0;
-            }
-
-            json checkPoint;
-            checkPoint["DENDRO_TS_TIME_BEGIN"] = m_uiTinfo._m_uiTb;
-            checkPoint["DENDRO_TS_TIME_END"] = m_uiTinfo._m_uiTe;
-            checkPoint["DENDRO_TS_ELEMENT_ORDER"] = m_uiElementOrder;
-
-            checkPoint["DENDRO_TS_TIME_CURRENT"] = m_uiTinfo._m_uiT;
-            checkPoint["DENDRO_TS_STEP_CURRENT"] = m_uiTinfo._m_uiStep;
-            checkPoint["DENDRO_TS_TIME_STEP_SIZE"] = m_uiTinfo._m_uiTh;
-            checkPoint["DENDRO_TS_LAST_IO_TIME"] = m_uiTinfo._m_uiT;
-
-            checkPoint["DENDRO_TS_WAVELET_TOLERANCE"] =
-                dsolve::DENDROSOLVER_WAVELET_TOL;
-            checkPoint["DENDRO_TS_LOAD_IMB_TOLERANCE"] =
-                dsolve::DENDROSOLVER_LOAD_IMB_TOL;
-            checkPoint["DENDRO_TS_NUM_VARS"] =
-                numVars;  // number of variables to restore.
-            checkPoint["DENDRO_TS_ACTIVE_COMM_SZ"] =
-                m_uiMesh
-                    ->getMPICommSize();  // (note that rank 0 is always active).
-
-            checkPoint["DENDRO_BH1_X"] = m_uiBHLoc[0].x();
-            checkPoint["DENDRO_BH1_Y"] = m_uiBHLoc[0].y();
-            checkPoint["DENDRO_BH1_Z"] = m_uiBHLoc[0].z();
-
-            checkPoint["DENDRO_BH2_X"] = m_uiBHLoc[1].x();
-            checkPoint["DENDRO_BH2_Y"] = m_uiBHLoc[1].y();
-            checkPoint["DENDRO_BH2_Z"] = m_uiBHLoc[1].z();
-
-            outfile << std::setw(4) << checkPoint << std::endl;
-            outfile.close();
-        }
-
-        delete[] eVar;
+    const bool is_merged =
+        ((dsolve::DENDROSOLVER_BH_LOC[0] - dsolve::DENDROSOLVER_BH_LOC[1])
+             .abs() < 0.1);
+    if (is_merged && !dsolve::DENDROSOLVER_MERGED_CHKPT_WRITTEN) {
+        cpIndex = 3;
+        dsolve::DENDROSOLVER_MERGED_CHKPT_WRITTEN = true;
     }
+
+    unsigned int rank = m_uiMesh->getMPIRank();
+    unsigned int npes = m_uiMesh->getMPICommSize();
+
+    DendroScalar* eVar[DENDROSOLVER_NUM_VARS];
+    DVec& m_evar = m_var[VL::CPU_EV];
+    m_evar.to_2d(eVar);
+
+    char fName[256];
+    const ot::TreeNode* pNodes = &(*(m_uiMesh->getAllElements().begin() +
+                                     m_uiMesh->getElementLocalBegin()));
+    sprintf(fName, "%s_octree_%d_%d.oct",
+            dsolve::DENDROSOLVER_CHKPT_FILE_PREFIX.c_str(), cpIndex, rank);
+    io::checkpoint::writeOctToFile(fName, pNodes,
+                                   m_uiMesh->getNumLocalMeshElements());
+
+    unsigned int numVars = dsolve::DENDROSOLVER_NUM_VARS;
+    const char** varNames = dsolve::DENDROSOLVER_VAR_NAMES;
+
+    sprintf(fName, "%s_%d_%d.var",
+            dsolve::DENDROSOLVER_CHKPT_FILE_PREFIX.c_str(), cpIndex, rank);
+    io::checkpoint::writeVecToFile(fName, m_uiMesh, (const double**)eVar,
+                                   dsolve::DENDROSOLVER_NUM_VARS);
+
+    if (!rank) {
+        sprintf(fName, "%s_step_%d.cp",
+                dsolve::DENDROSOLVER_CHKPT_FILE_PREFIX.c_str(), cpIndex);
+        std::cout << "[DENDROSOLVERCtx] \t writing checkpoint file : " << fName
+                  << std::endl;
+        std::ofstream outfile(fName);
+        if (!outfile) {
+            std::cout << fName << " file open failed " << std::endl;
+            return 0;
+        }
+
+        json checkPoint;
+        checkPoint["DENDRO_TS_TIME_BEGIN"] = m_uiTinfo._m_uiTb;
+        checkPoint["DENDRO_TS_TIME_END"] = m_uiTinfo._m_uiTe;
+        checkPoint["DENDRO_TS_ELEMENT_ORDER"] = m_uiElementOrder;
+
+        checkPoint["DENDRO_TS_TIME_CURRENT"] = m_uiTinfo._m_uiT;
+        checkPoint["DENDRO_TS_STEP_CURRENT"] = m_uiTinfo._m_uiStep;
+        checkPoint["DENDRO_TS_TIME_STEP_SIZE"] = m_uiTinfo._m_uiTh;
+        checkPoint["DENDRO_TS_LAST_IO_TIME"] = m_uiTinfo._m_uiT;
+
+        checkPoint["DENDRO_TS_WAVELET_TOLERANCE"] =
+            dsolve::DENDROSOLVER_WAVELET_TOL;
+        checkPoint["DENDRO_TS_LOAD_IMB_TOLERANCE"] =
+            dsolve::DENDROSOLVER_LOAD_IMB_TOL;
+        checkPoint["DENDRO_TS_NUM_VARS"] =
+            numVars;  // number of variables to restore.
+        checkPoint["DENDRO_TS_ACTIVE_COMM_SZ"] =
+            m_uiMesh->getMPICommSize();  // (note that rank 0 is always active).
+
+        checkPoint["DENDRO_BH1_X"] = m_uiBHLoc[0].x();
+        checkPoint["DENDRO_BH1_Y"] = m_uiBHLoc[0].y();
+        checkPoint["DENDRO_BH1_Z"] = m_uiBHLoc[0].z();
+
+        checkPoint["DENDRO_BH2_X"] = m_uiBHLoc[1].x();
+        checkPoint["DENDRO_BH2_Y"] = m_uiBHLoc[1].y();
+        checkPoint["DENDRO_BH2_Z"] = m_uiBHLoc[1].z();
+
+        outfile << std::setw(4) << checkPoint << std::endl;
+        outfile.close();
+    }
+
     return 0;
 }
 
@@ -872,7 +588,7 @@ int SOLVERCtx::restore_checkpt() {
     unsigned int restoreStatusGlobal =
         0;  // 0 indicates successfully restorable.
 
-    ot::Mesh *newMesh;
+    ot::Mesh* newMesh;
     unsigned int restoreStep[2];
     restoreStep[0] = 0;
     restoreStep[1] = 0;
@@ -931,8 +647,9 @@ int SOLVERCtx::restore_checkpt() {
     restoreStatus = 0;
     octree.clear();
     if (!rank)
-        std::cout << "[SOLVERCtx] :  Trying to restore from checkpoint index : "
-                  << restoreFileIndex << std::endl;
+        std::cout
+            << "[DENDROSOLVERCtx] :  Trying to restore from checkpoint index : "
+            << restoreFileIndex << std::endl;
 
     if (!rank) {
         sprintf(fName, "%s_step_%d.cp",
@@ -974,9 +691,9 @@ int SOLVERCtx::restore_checkpt() {
     par::Mpi_Allreduce(&restoreStatus, &restoreStatusGlobal, 1, MPI_MAX, comm);
     if (restoreStatusGlobal == 1) {
         if (!rank)
-            std::cout
-                << "[SOLVERCtx] : Restore step failed, restore file corrupted. "
-                << std::endl;
+            std::cout << "[DENDROSOLVERCtx] : Restore step failed, restore "
+                         "file corrupted. "
+                      << std::endl;
         MPI_Abort(comm, 0);
     }
 
@@ -995,7 +712,8 @@ int SOLVERCtx::restore_checkpt() {
     if (activeCommSz > npes) {
         if (!rank)
             std::cout
-                << " [SOLVERCtx] : checkpoint file written from  a larger "
+                << " [DENDROSOLVERCtx] : checkpoint file written from  a "
+                   "larger "
                    "communicator than the current global comm. (i.e. "
                    "communicator shrinking not allowed in the restore step. )"
                 << std::endl;
@@ -1026,9 +744,9 @@ int SOLVERCtx::restore_checkpt() {
     par::Mpi_Allreduce(&restoreStatus, &restoreStatusGlobal, 1, MPI_MAX, comm);
     if (restoreStatusGlobal == 1) {
         if (!rank)
-            std::cout
-                << "[SOLVERCtx]: octree (*.oct) restore file is corrupted "
-                << std::endl;
+            std::cout << "[DENDROSOLVERCtx]: octree (*.oct) restore file is "
+                         "corrupted "
+                      << std::endl;
         MPI_Abort(comm, 0);
     }
 
@@ -1039,16 +757,39 @@ int SOLVERCtx::restore_checkpt() {
         Point(dsolve::DENDROSOLVER_GRID_MAX_X, dsolve::DENDROSOLVER_GRID_MAX_Y,
               dsolve::DENDROSOLVER_GRID_MAX_Z));
     // no need to transfer data only to resize the contex variables.
-    this->grid_transfer(newMesh, false, false, false);
-    this->update_app_vars();
+    // this->grid_transfer(newMesh);
+    for (unsigned int i = 0; i < VL::END; i++) m_var[i].destroy_vector();
+
+    m_var[VL::CPU_EV].create_vector(newMesh, ot::DVEC_TYPE::OCT_SHARED_NODES,
+                                    ot::DVEC_LOC::HOST, DENDROSOLVER_NUM_VARS,
+                                    true);
+    m_var[VL::CPU_EV_UZ_IN].create_vector(
+        newMesh, ot::DVEC_TYPE::OCT_LOCAL_WITH_PADDING, ot::DVEC_LOC::HOST,
+        DENDROSOLVER_NUM_VARS, true);
+    m_var[VL::CPU_EV_UZ_OUT].create_vector(
+        newMesh, ot::DVEC_TYPE::OCT_LOCAL_WITH_PADDING, ot::DVEC_LOC::HOST,
+        DENDROSOLVER_NUM_VARS, true);
+
+    m_var[VL::CPU_CV].create_vector(newMesh, ot::DVEC_TYPE::OCT_SHARED_NODES,
+                                    ot::DVEC_LOC::HOST,
+                                    DENDROSOLVER_CONSTRAINT_NUM_VARS, true);
+    m_var[VL::CPU_CV_UZ_IN].create_vector(
+        newMesh, ot::DVEC_TYPE::OCT_LOCAL_WITH_PADDING, ot::DVEC_LOC::HOST,
+        DENDROSOLVER_CONSTRAINT_NUM_VARS, true);
+
+    ot::dealloc_mpi_ctx<DendroScalar>(
+        m_uiMesh, m_mpi_ctx, DENDROSOLVER_NUM_VARS, DENDROSOLVER_ASYNC_COMM_K);
+    ot::alloc_mpi_ctx<DendroScalar>(newMesh, m_mpi_ctx, DENDROSOLVER_NUM_VARS,
+                                    DENDROSOLVER_ASYNC_COMM_K);
 
     // only reads the evolution variables.
     if (isActive) {
         int activeRank;
         int activeNpes;
 
-        DendroScalar **inVec = NULL;
-        m_uiEVar.Get2DArray(inVec, false);
+        DendroScalar* inVec[DENDROSOLVER_NUM_VARS];
+        DVec& m_evar = m_var[VL::CPU_EV];
+        m_evar.to_2d(inVec);
 
         MPI_Comm_rank(newComm, &activeRank);
         MPI_Comm_size(newComm, &activeNpes);
@@ -1059,16 +800,15 @@ int SOLVERCtx::restore_checkpt() {
                 restoreFileIndex, activeRank);
         restoreStatus = io::checkpoint::readVecFromFile(
             fName, newMesh, inVec, dsolve::DENDROSOLVER_NUM_VARS);
-
-        delete[] inVec;
     }
 
     MPI_Comm_free(&newComm);
     par::Mpi_Allreduce(&restoreStatus, &restoreStatusGlobal, 1, MPI_MAX, comm);
     if (restoreStatusGlobal == 1) {
         if (!rank)
-            std::cout << "[SOLVERCtx]: varible (*.var) restore file currupted "
-                      << std::endl;
+            std::cout
+                << "[DENDROSOLVERCtx]: varible (*.var) restore file currupted "
+                << std::endl;
         MPI_Abort(comm, 0);
     }
 
@@ -1100,16 +840,11 @@ int SOLVERCtx::pre_stage(DVec sIn) { return 0; }
 int SOLVERCtx::post_stage(DVec sIn) { return 0; }
 
 int SOLVERCtx::post_timestep(DVec sIn) {
-    // we need to enforce constraint before computing the HAM and MOM_i
-    // constraints.
-    DendroScalar **sVar;
-    sIn.Get2DArray(sVar, false);
-
+    DendroScalar* evar[DENDROSOLVER_NUM_VARS];
+    sIn.to_2d(evar);
     for (unsigned int node = m_uiMesh->getNodeLocalBegin();
          node < m_uiMesh->getNodeLocalEnd(); node++)
-        enforce_solver_constraints(sVar, node);
-
-    delete[] sVar;
+        enforce_solver_constraints(evar, node);
 
     return 0;
 }
@@ -1118,12 +853,19 @@ bool SOLVERCtx::is_remesh() {
     bool isRefine = false;
     if (dsolve::DENDROSOLVER_ENABLE_BLOCK_ADAPTIVITY) return false;
 
+    if (dsolve::DENDROSOLVER_REFINEMENT_MODE ==
+        dsolve::RefinementMode::REFINE_MODE_NONE)
+        return false;
+
     MPI_Comm comm = m_uiMesh->getMPIGlobalCommunicator();
 
-    this->unzip(m_uiEVar, m_uiEUnzip[0], dsolve::DENDROSOLVER_ASYNC_COMM_K);
+    DVec& m_evar = m_var[VL::CPU_EV];
+    DVec& m_evar_unz = m_var[VL::CPU_EV_UZ_IN];
 
-    DendroScalar **unzipVar;
-    m_uiEUnzip[0].Get2DArray(unzipVar, false);
+    this->unzip(m_evar, m_evar_unz, dsolve::DENDROSOLVER_ASYNC_COMM_K);
+
+    DendroScalar* unzipVar[DENDROSOLVER_NUM_VARS];
+    m_evar_unz.to_2d(unzipVar);
 
     unsigned int refineVarIds[dsolve::DENDROSOLVER_NUM_REFINE_VARS];
     for (unsigned int vIndex = 0; vIndex < dsolve::DENDROSOLVER_NUM_REFINE_VARS;
@@ -1132,30 +874,34 @@ bool SOLVERCtx::is_remesh() {
             dsolve::DENDROSOLVER_REFINE_VARIABLE_INDICES[vIndex];
 
     double wTol = dsolve::DENDROSOLVER_WAVELET_TOL;
-    std::function<double(double, double, double, double *hx)> waveletTolFunc =
-        [](double x, double y, double z, double *hx) {
+    std::function<double(double, double, double, double* hx)> waveletTolFunc =
+        [](double x, double y, double z, double* hx) {
             return dsolve::computeWTolDCoords(x, y, z, hx);
         };
 
+    // TODO: can remove the different refinement modes if we don't want BH tied
+    // to it
     if (dsolve::DENDROSOLVER_REFINEMENT_MODE == dsolve::RefinementMode::WAMR) {
         isRefine = dsolve::isReMeshWAMR(
-            m_uiMesh, (const double **)unzipVar, refineVarIds,
+            m_uiMesh, (const double**)unzipVar, refineVarIds,
             dsolve::DENDROSOLVER_NUM_REFINE_VARS, waveletTolFunc,
             dsolve::DENDROSOLVER_DENDRO_AMR_FAC);
+
     } else if (dsolve::DENDROSOLVER_REFINEMENT_MODE ==
                dsolve::RefinementMode::EH) {
         isRefine = dsolve::isRemeshEH(
-            m_uiMesh, (const double **)unzipVar, dsolve::VAR::U_ALPHA,
+            m_uiMesh, (const double**)unzipVar, dsolve::VAR::U_ALPHA,
             dsolve::DENDROSOLVER_EH_REFINE_VAL,
             dsolve::DENDROSOLVER_EH_COARSEN_VAL, true);
+
     } else if (dsolve::DENDROSOLVER_REFINEMENT_MODE ==
                dsolve::RefinementMode::EH_WAMR) {
         const bool isR1 = dsolve::isReMeshWAMR(
-            m_uiMesh, (const double **)unzipVar, refineVarIds,
+            m_uiMesh, (const double**)unzipVar, refineVarIds,
             dsolve::DENDROSOLVER_NUM_REFINE_VARS, waveletTolFunc,
             dsolve::DENDROSOLVER_DENDRO_AMR_FAC);
         const bool isR2 = dsolve::isRemeshEH(
-            m_uiMesh, (const double **)unzipVar, dsolve::VAR::U_ALPHA,
+            m_uiMesh, (const double**)unzipVar, dsolve::VAR::U_ALPHA,
             dsolve::DENDROSOLVER_EH_REFINE_VAL,
             dsolve::DENDROSOLVER_EH_COARSEN_VAL, false);
 
@@ -1164,8 +910,6 @@ bool SOLVERCtx::is_remesh() {
                dsolve::RefinementMode::BH_LOC) {
         isRefine = dsolve::isRemeshBH(m_uiMesh, m_uiBHLoc);
     }
-
-    delete[] unzipVar;
 
     return isRefine;
 }
@@ -1182,20 +926,25 @@ int SOLVERCtx::update_app_vars() {
     return 0;
 }
 
-DVec SOLVERCtx::get_evolution_vars() { return m_uiEVar; }
+DVec& SOLVERCtx::get_evolution_vars() { return m_var[CPU_EV]; }
 
-DVec SOLVERCtx::get_constraint_vars() { return m_uiCVar; }
+DVec& SOLVERCtx::get_constraint_vars() { return m_var[CPU_CV]; }
 
-DVec SOLVERCtx::get_primitive_vars() { return m_uiPVar; }
+// DVec SOLVERCtx::get_primitive_vars() { return m_var[CPU_PV]; }
 
 int SOLVERCtx::terminal_output() {
-    DendroScalar min = 0, max = 0;
-    m_uiEVar.VecMinMax(m_uiMesh, min, max, dsolve::VAR::U_ALPHA);
-
     if (m_uiMesh->isActive()) {
+        DendroScalar min = 0, max = 0;
+        DVec& m_evar = m_var[VL::CPU_EV];
+        min = vecMin(m_uiMesh, m_evar.get_vec_ptr(), ot::VEC_TYPE::CG_NODAL,
+                     true);
+        max = vecMax(m_uiMesh, m_evar.get_vec_ptr(), ot::VEC_TYPE::CG_NODAL,
+                     true);
+
+        // TODO: maybe adjust this one?
         if (!(m_uiMesh->getMPIRank())) {
-            std::cout << "[SOLVERCtx]:  "
-                      << dsolve::DENDROSOLVER_VAR_NAMES[dsolve::VAR::U_ALPHA]
+            std::cout << "[DENDROSOLVERCtx]:  "
+                      << dsolve::DENDROSOLVER_VAR_NAMES[0]
                       << " (min,max) : \t ( " << min << ", " << max << " ) "
                       << std::endl;
             if (std::isnan(min) || std::isnan(max)) {
@@ -1208,10 +957,51 @@ int SOLVERCtx::terminal_output() {
     return 0;
 }
 
+int SOLVERCtx::grid_transfer(const ot::Mesh* m_new) {
+#ifdef __PROFILE_CTX__
+    m_uiCtxpt[ts::CTXPROFILE::GRID_TRASFER].start();
+#endif
+    DVec& m_evar = m_var[VL::CPU_EV];
+    DVec::grid_transfer(m_uiMesh, m_new, m_evar);
+    // printf("igt ended\n");
+
+    m_var[VL::CPU_CV].destroy_vector();
+    m_var[VL::CPU_CV_UZ_IN].destroy_vector();
+
+    m_var[VL::CPU_EV_UZ_IN].destroy_vector();
+    m_var[VL::CPU_EV_UZ_OUT].destroy_vector();
+
+    m_var[VL::CPU_CV].create_vector(m_new, ot::DVEC_TYPE::OCT_SHARED_NODES,
+                                    ot::DVEC_LOC::HOST,
+                                    DENDROSOLVER_CONSTRAINT_NUM_VARS, true);
+    m_var[VL::CPU_CV_UZ_IN].create_vector(
+        m_new, ot::DVEC_TYPE::OCT_LOCAL_WITH_PADDING, ot::DVEC_LOC::HOST,
+        DENDROSOLVER_CONSTRAINT_NUM_VARS, true);
+
+    m_var[VL::CPU_EV_UZ_IN].create_vector(
+        m_new, ot::DVEC_TYPE::OCT_LOCAL_WITH_PADDING, ot::DVEC_LOC::HOST,
+        DENDROSOLVER_NUM_VARS, true);
+    m_var[VL::CPU_EV_UZ_OUT].create_vector(
+        m_new, ot::DVEC_TYPE::OCT_LOCAL_WITH_PADDING, ot::DVEC_LOC::HOST,
+        DENDROSOLVER_NUM_VARS, true);
+
+    ot::dealloc_mpi_ctx<DendroScalar>(
+        m_uiMesh, m_mpi_ctx, DENDROSOLVER_NUM_VARS, DENDROSOLVER_ASYNC_COMM_K);
+    ot::alloc_mpi_ctx<DendroScalar>(m_new, m_mpi_ctx, DENDROSOLVER_NUM_VARS,
+                                    DENDROSOLVER_ASYNC_COMM_K);
+
+    m_uiIsETSSynced = false;
+
+#ifdef __PROFILE_CTX__
+    m_uiCtxpt[ts::CTXPROFILE::GRID_TRASFER].stop();
+#endif
+    return 0;
+}
+
 unsigned int SOLVERCtx::compute_lts_ts_offset() {
-    const ot::Block *blkList = m_uiMesh->getLocalBlockList().data();
+    const ot::Block* blkList = m_uiMesh->getLocalBlockList().data();
     const unsigned int numBlocks = m_uiMesh->getLocalBlockList().size();
-    const ot::TreeNode *pNodes = m_uiMesh->getAllElements().data();
+    const ot::TreeNode* pNodes = m_uiMesh->getAllElements().data();
 
     const unsigned int ldiff = 0;
 
@@ -1241,9 +1031,18 @@ unsigned int SOLVERCtx::compute_lts_ts_offset() {
         const double r_coord = pt_domain.abs();
 
         double eta;
-        eta = ETA_CONST;
-        if (r_coord >= ETA_R0) {
-            eta *= pow((ETA_R0 / r_coord), ETA_DAMPING_EXP);
+        if (dsolve::RIT_ETA_FUNCTION == 0) {
+            // HAD eta function
+            eta = ETA_CONST;
+            if (r_coord >= ETA_R0) {
+                eta *= pow((ETA_R0 / r_coord), ETA_DAMPING_EXP);
+            }
+        } else {
+            // RIT eta function
+            double w = r_coord / dsolve::RIT_ETA_WIDTH;
+            double arg = -w * w * w * w;
+            eta = (dsolve::RIT_ETA_CENTRAL - dsolve::RIT_ETA_OUTER) * exp(arg) +
+                  dsolve::RIT_ETA_OUTER;
         }
 
         const double dt_eta = dt_eta_fac * (1 / eta);
@@ -1288,9 +1087,9 @@ void SOLVERCtx::evolve_bh_loc(DVec sIn, double dt) {
     m_uiMesh->readFromGhostEnd(
         sIn.GetVecArray() + VAR::U_BETA0 * m_uiMesh->getDegOfFreedom(), 3);
     Point bhLoc[2];
-    DendroScalar **evar = new DendroScalar *[dsolve::DENDROSOLVER_NUM_VARS];
+    DendroScalar** evar = new DendroScalar*[dsolve::DENDROSOLVER_NUM_VARS];
     sIn.Get2DArray(evar, true);
-    dsolve::computeBHLocations((const ot::Mesh *)m_uiMesh, m_uiBHLoc, bhLoc,
+    dsolve::computeBHLocations((const ot::Mesh*)m_uiMesh, m_uiBHLoc, bhLoc,
                                evar, dt);
     // if(!m_uiMesh->getMPIRankGlobal())
     // {

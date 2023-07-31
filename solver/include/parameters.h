@@ -1,4 +1,4 @@
-
+// TODO: need to figure out what the static parameters are so they can't be modified by a file
 
 #ifndef DENDROSOLVER_PARAMETERS_H_
 #define DENDROSOLVER_PARAMETERS_H_

@@ -13,7 +13,7 @@
 #include <iostream>
 #include <vector>
 
-#include "../dendro/include/dendroProfileParams.h"
+#include "../dendrolib/include/dendroProfileParams.h"
 #include "solverCtx.h"
 #include "enuts.h"
 #include "ets.h"

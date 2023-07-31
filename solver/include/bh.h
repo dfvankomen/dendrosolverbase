@@ -1,18 +1,18 @@
 //
-// Created by David
-//
+// Created by milinda on 7/25/17.
 /**
- * @author Milinda Fernando / David Van Komen
- * School of Computing, University of Utah
- * @brief Contins a basic structure to store the black hole parameters
+ *@author Milinda Fernando
+ *School of Computing, University of Utah
+ *@brief Contains a basic structure to store the black hole parameters.
  */
+//
 
 #ifndef DENDROSOLVER_BH_H_
 #define DENDROSOLVER_BH_H_
 
 #include "point.h"
-
 namespace dsolve {
+
 struct BH {
    private:
     /**@brief mass of the black hole*/
@@ -75,6 +75,7 @@ struct BH {
     /**@brief returns spin(phi) of BH */
     inline double getBHSpinPhi() const { return m_uiSpinPhi; }
 };
-}  // namespace dsolve
+
+}  // end of namespace dsolve
 
 #endif  // DENDROSOLVER_BH_H_
